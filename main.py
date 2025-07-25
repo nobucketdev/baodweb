@@ -13,6 +13,7 @@ from wcwidth import wcswidth
 from textwrap import wrap
 from functools import lru_cache
 
+print(f"BaodWeb Terminal Browser version {__version__}")
 # --- PyInstaller Path Handling ---
 # This function helps PyInstaller locate bundled resources.
 # When the script is bundled, sys._MEIPASS will contain the path to the temporary
