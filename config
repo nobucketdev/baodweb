@@ -1,0 +1,40 @@
+# TUI Web Browser Configuration
+# Set options to 1 to enable, 0 to disable
+# Set language (e.g., EN, FR, ES) to control localized page loading
+
+enable-color = 1
+language = EN
+render-article = 1
+render-body = 1
+render-ol = 1
+render-button = 1
+render-thead = 1
+render-b = 1
+render-ins = 1
+render-em = 1
+render-ul = 1
+render-h1 = 1
+render-strong = 1
+render-th = 1
+render-sup = 1
+render-mark = 1
+render-nav = 1
+render-html = 1
+render-table = 1
+render-a = 1
+render-p = 1
+render-sub = 1
+render-img = 0
+render-tr = 1
+render-h3 = 1
+render-section = 1
+render-td = 1
+render-div = 1
+render-del = 1
+render-span = 1
+render-h2 = 1
+render-tbody = 1
+render-main = 1
+render-i = 1
+render-u = 1
+render-li = 1
