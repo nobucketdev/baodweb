@@ -2,28 +2,50 @@
 
 ## Supported Versions
 
-BaodWeb is under active development. The latest version on the `main` branch is considered the most stable.
+BaodWeb is currently in early development. Only the latest release is actively maintained and eligible for security updates.
 
-## Reporting a Vulnerability
-
-If you discover a security vulnerability, **please do not create a public issue**.
-
-Instead, report it privately via email to:
-
-📧 **giabaoct2012@gmail.com**
-
-Include as much detail as possible:
-- Description of the issue
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
-
-I will respond within 3–5 working days. If confirmed, the issue will be addressed promptly, and a patch will be released. Responsible disclosure is appreciated.
-
-## Scope
-
-This project does **not** currently support encrypted traffic (HTTPS parsing), and should be used for educational or experimental purposes only. Treat all untrusted content as unsafe.
+| Version  | Supported        |
+|----------|------------------|
+| 1.0.0    | Yes              |
+| < 1.0.0  | No               |
 
 ---
 
-_This policy is based on GitHub’s recommended template for open-source projects._
+## Reporting a Vulnerability
+
+If you find a security vulnerability in BaodWeb, please report it **privately**.
+
+### 📬 Contact
+- Email: **baodweb@proton.me**
+- Subject: `Security Vulnerability Report: BaodWeb`
+
+Please include:
+- A clear description of the issue
+- Steps to reproduce (if possible)
+- The potential impact
+- Any suggestions for remediation
+
+---
+
+### ⏳ What to Expect
+
+- I’ll respond within **3–5 working days**
+- If confirmed, I’ll work on a patch and notify you when it's resolved
+- If the report is invalid or out of scope, I’ll explain why
+
+---
+
+## Disclosure Policy
+
+- Please **do not** publicly disclose vulnerabilities without prior notice
+- I support responsible disclosure and credit researchers in release notes (optional)
+
+---
+
+## Known Limitations
+
+BaodWeb is a terminal-based browser with limited sandboxing. It is not designed to handle untrusted or live external content. Use it with caution and at your own risk.
+
+---
+
+Thanks for helping make this project safer. 💪
