@@ -16,7 +16,7 @@ BaodWeb is currently in early development. Only the latest release is actively m
 If you find a security vulnerability in BaodWeb, please report it **privately**.
 
 ### 📬 Contact
-- Email: **baodweb@proton.me**
+- Email: **baodvn@proton.me**
 - Subject: `Security Vulnerability Report: BaodWeb`
 
 Please include:
