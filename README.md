@@ -1,5 +1,10 @@
 # BaodWeb - Terminal Web Browser
 
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Python](https://img.shields.io/badge/python-3.11+-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-lightgrey)
+
+
 **BaodWeb** is a terminal-based web browser written in Python. It fetches and renders HTML with support for ANSI color, styled text, dynamic image rendering, and interactive features — all from the command line.
 
 ---
