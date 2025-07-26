@@ -12,6 +12,8 @@ import shutil
 from wcwidth import wcswidth
 from textwrap import wrap
 from functools import lru_cache
+from datetime import datetime # Added for local time
+from collections import deque
 
 print(f"BaodWeb Terminal Browser version {__version__}")
 # --- PyInstaller Path Handling ---
@@ -505,13 +507,56 @@ class Nav:
         output_lines.append(bottom_border)
 
         return "\n".join(output_lines) + "\n"
+
+# New WidgetElement class
+class WidgetElement:
+    def __init__(self, widget_type, dashboard_generator):
+        self.widget_type = widget_type
+        self.dashboard_generator = dashboard_generator # Dependency injection for data source
+        self.tag_type = 'widget'
+
+    def render(self, enable_color=True):
+        content = ""
+        if self.widget_type == "time":
+            time_data = self.dashboard_generator.get_local_time()
+            content = f"Current Time: {BOLD}{time_data}{RESET}"
+        elif self.widget_type == "weather":
+            weather_data = self.dashboard_generator.get_weather_data()
+            content = f"Weather: {BOLD}{weather_data}{RESET}"
+        elif self.widget_type == "news":
+            news_headlines = self.dashboard_generator.get_news_headlines()
+            if news_headlines:
+                content = f"{BOLD}Latest News:{RESET}\n" + "\n".join([f"  • {headline}" for headline in news_headlines])
+            else:
+                content = "No news available."
+        else:
+            content = f"Unknown widget type: {self.widget_type}"
+        
+        # Add a simple border for the widget
+        border_char = "─"
+        padding = 2
+        lines = content.split('\n')
+        max_line_width = max(wcswidth(re.sub(r'\x1b\[[0-9;]*m', '', line)) for line in lines)
+        
+        top_border = f"╭{border_char * (max_line_width + padding * 2)}╮"
+        bottom_border = f"╰{border_char * (max_line_width + padding * 2)}╯"
+        
+        rendered_widget = [top_border]
+        for line in lines:
+            clean_line_width = wcswidth(re.sub(r'\x1b\[[0-9;]*m', '', line))
+            rendered_widget.append(f"│{' ' * padding}{line}{' ' * (max_line_width - clean_line_width + padding)}│")
+        rendered_widget.append(bottom_border)
+        
+        return "\n".join(rendered_widget) + "\n"
+
 SUPPORTED_TAGS = {'html', 'body', 'section', 'article', 'main', 'div',
                   'h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'a', 'button', 'img', 'nav',
-                  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'span'} # Added inline tags here
+                  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'span',
+                  'widget'} # Added 'widget' here
 
 class Parser:
-    def __init__(self):
-        pass
+    def __init__(self, dashboard_generator=None): # Pass dashboard_generator to parser
+        self.dashboard_generator = dashboard_generator
 
     SUBSCRIPT_MAP = {
         '0': '\u2080', '1': '\u2081', '2': '\u2082', '3': '\u2083', '4': '\u2084',
@@ -680,6 +725,15 @@ class Parser:
             for child in tag.contents:
                 elements.extend(self.parse_element(child, current_anchors, next_anchor_id)) #
             return [Nav(elements)]
+        
+        # New widget tag handling
+        elif tag_name == 'widget':
+            widget_type = tag.get('type')
+            if widget_type and self.dashboard_generator:
+                return [WidgetElement(widget_type, self.dashboard_generator)]
+            else:
+                print(f"Warning: <widget> tag found without 'type' attribute or dashboard_generator not provided.", file=sys.stderr)
+                return []
 
         else:
             # For unsupported tags, try to parse children recursively
@@ -766,7 +820,16 @@ class Parser:
                         parsed_inline_elements.append(TextNode(converted_text))
                 elif tag_name == 'span':
                     parsed_inline_elements.extend(self._parse_inline_content(content_node, current_anchors, next_anchor_id)) #
-
+                # Handle widget tag in inline content (though typically block-level, good for robustness)
+                elif tag_name == 'widget':
+                    widget_type = content_node.get('type')
+                    if widget_type and self.dashboard_generator:
+                        parsed_inline_elements.append(WidgetElement(widget_type, self.dashboard_generator))
+                    else:
+                        # Fallback to text if widget cannot be rendered
+                        text = content_node.get_text(strip=True)
+                        if text:
+                            parsed_inline_elements.append(TextNode(text))
                 else:
                     # For other unsupported inline tags, just get their text content
                     # Keep strip=True here, as it's typically for the text content within the tag.
@@ -861,6 +924,10 @@ class HtmlGenerator:
             body_content.append("<th>A standalone table header cell.</th>")
         elif tag_name == 'td': # For direct td generation, mostly for internal use
             body_content.append("<td>A standalone table data cell.</td>")
+        elif tag_name == 'widget': # New: Generate a sample widget
+            body_content.append('<widget type="time"></widget>')
+            body_content.append('<widget type="weather"></widget>')
+            body_content.append('<widget type="news"></widget>')
         else:
             # For other unsupported or generic tags, just add a simple instance of it
             body_content.append(f"<{tag_name}>Content for {tag_name} tag.</{tag_name}>")
@@ -885,6 +952,9 @@ class ConfigManager:
     DEFAULT_CONFIG = {
         "enable-color": "1",
         "language": "EN", # New default language setting
+        "first_run": "1", # Added for first-time user detection
+        "weather_api_key": "", # New: Placeholder for WeatherAPI.com key
+        "weather_location": "Can Tho", # New: Default weather location
     }
     # Add default render settings for all supported tags
     for tag in SUPPORTED_TAGS:
@@ -926,6 +996,9 @@ class ConfigManager:
                 f.write("# TUI Web Browser Configuration\n")
                 f.write("# Set options to 1 to enable, 0 to disable\n")
                 f.write("# Set language (e.g., EN, FR, ES) to control localized page loading\n\n") #
+                f.write("# first_run: 1 if it's the first time the browser is launched, 0 otherwise.\n") # Added comment for first_run
+                f.write("# weather_api_key: Your API key for WeatherAPI.com (get from weatherapi.com)\n") # Added comment for API key
+                f.write("# weather_location: Default location for weather data (e.g., 'London', 'New York', 'Can Tho')\n\n") # Added comment for weather location
                 for key, value in self.DEFAULT_CONFIG.items():
                     f.write(f"{key} = {value}\n")
             self.config = self.DEFAULT_CONFIG.copy()
@@ -940,6 +1013,9 @@ class ConfigManager:
                 f.write("# TUI Web Browser Configuration\n")
                 f.write("# Set options to 1 to enable, 0 to disable\n")
                 f.write("# Set language (e.g., EN, FR, ES) to control localized page loading\n\n")
+                f.write("# first_run: 1 if it's the first time the browser is launched, 0 otherwise.\n") # Added comment for first_run
+                f.write("# weather_api_key: Your API key for WeatherAPI.com (get from weatherapi.com)\n") # Added comment for API key
+                f.write("# weather_location: Default location for weather data (e.g., 'London', 'New York', 'Can Tho')\n\n") # Added comment for weather location
                 for key, value in self.config.items():
                     f.write(f"{key} = {value}\n")
             print(f"Configuration saved to {self.config_path}")
@@ -953,8 +1029,8 @@ class ConfigManager:
             return False
 
         # Type validation for specific keys
-        if key == "enable-color" and value not in ["0", "1"]:
-            print(f"Error: 'enable-color' must be 0 or 1. Received '{value}'.", file=sys.stderr)
+        if key in ["enable-color", "first_run"] and value not in ["0", "1"]: # Added first_run to validation
+            print(f"Error: '{key}' must be 0 or 1. Received '{value}'.", file=sys.stderr)
             return False
         
         if key == "language":
@@ -989,6 +1065,17 @@ class ConfigManager:
             return True
         return self.get(f"render-{tag_name}", "1") == "1"
 
+    def is_first_run(self):
+        """Checks if this is the first time the browser is run."""
+        return self.get("first_run", "1") == "1"
+
+    def mark_as_not_first_run(self):
+        """Marks the browser as having been run before."""
+        if self.get("first_run") == "1":
+            self.set("first_run", "0")
+            print("Marked as not first run.")
+
+
 # --- Renderer ---
 class Renderer:
     def __init__(self, config_manager):
@@ -998,12 +1085,35 @@ class Renderer:
         enable_color = self.config_manager.is_color_enabled()
 
         if title:
-            if enable_color:
-                print(f"{UNDERLINE}{BOLD}{CYAN_FG}{' ' * (len(title) + 13)}{RESET}")
-                print(f"{UNDERLINE}{BOLD}{CYAN_FG}|     {title}     |{RESET}")
-            else:
-                print(f"--- {title} ---")
+            # Unicode rounded box drawing characters
+            top_left = '╭'
+            top_right = '╮'
+            bottom_left = '╰'
+            bottom_right = '╯'
+            horizontal = '─'
+            vertical = '│'
+    
+            # Calculate padding and total width
+            # 4 spaces on each side of the title within the box
+            padding_internal = 4 
+            # Total width of the horizontal line including 2 for the spaces next to the vertical lines
+            total_line_width = len(title) + (padding_internal * 2) + 2 
 
+            if enable_color:
+                # Top border
+                print(f"{BOLD}{CYAN_FG}{top_left}{horizontal * total_line_width}{top_right}{RESET}")
+                # Title line
+                # Note: UNDERLINE is applied to the title text itself if you want it, not the box.
+                print(f"{BOLD}{CYAN_FG}{vertical}{' ' * padding_internal} {title}{RESET}{BOLD}{CYAN_FG} {' ' * padding_internal}{vertical}{RESET}")
+                # Bottom border
+                print(f"{BOLD}{CYAN_FG}{bottom_left}{horizontal * total_line_width}{bottom_right}{RESET}")
+            else:
+                # Top border
+                print(f"{top_left}{horizontal * total_line_width}{top_right}")
+                # Title line
+                print(f"{vertical}{' ' * padding_internal} {title} {' ' * padding_internal}{vertical}")
+                # Bottom border
+                print(f"{bottom_left}{horizontal * total_line_width}{bottom_right}")
 
         # Recursively render elements, applying tag filtering
         self._render_elements_recursive(elements, enable_color)
@@ -1036,26 +1146,141 @@ class Renderer:
         self.clear()
         self.render(elements, title)
 
+
+# --- Dashboard Content Generator (Simulated Plugins) ---
+class DashboardContentGenerator:
+    def __init__(self, location="Can Tho", weather_api_key=None):
+        self.location = location
+        self.weather_api_key = weather_api_key
+        self.WEATHER_API_BASE_URL = "http://api.weatherapi.com/v1/current.json"
+
+    def get_local_time(self):
+        """Returns the current local time."""
+        now = datetime.now()
+        return now.strftime("%Y-%m-%d %H:%M:%S")
+
+    def get_weather_data(self):
+        """Fetches or simulates local weather data."""
+        if self.weather_api_key and self.location:
+            params = {
+                "key": self.weather_api_key,
+                "q": self.location
+            }
+            try:
+                response = requests.get(self.WEATHER_API_BASE_URL, params=params, timeout=5)
+                response.raise_for_status() # Raise an exception for HTTP errors
+                data = response.json()
+                
+                # Extract relevant weather information
+                if "current" in data and "location" in data:
+                    temp_c = data["current"]["temp_c"]
+                    condition_text = data["current"]["condition"]["text"]
+                    city = data["location"]["name"]
+                    region = data["location"]["region"]
+                    return f"{temp_c}°C, {condition_text} in {city}, {region}"
+                else:
+                    print("WeatherAPI response missing 'current' or 'location' data.", file=sys.stderr)
+                    return self._get_simulated_weather_data() # Fallback
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching weather from WeatherAPI.com: {e}", file=sys.stderr)
+                return self._get_simulated_weather_data() # Fallback to simulated
+            except Exception as e:
+                print(f"Unexpected error parsing weather data: {e}", file=sys.stderr)
+                return self._get_simulated_weather_data() # Fallback to simulated
+        else:
+            return self._get_simulated_weather_data() # No API key or location, use simulated
+
+    def _get_simulated_weather_data(self):
+        """Simulates fetching local weather data."""
+        temperatures = [25, 26, 27, 28, 29, 30, 31, 32] # Celsius
+        conditions = ["Sunny", "Partly Cloudy", "Light Rain", "Cloudy"]
+        
+        temp = random.choice(temperatures)
+        condition = random.choice(conditions)
+        
+        return f"{temp}°C, {condition} (Simulated)"
+
+    def get_news_headlines(self):
+        """Simulates fetching news headlines."""
+        headlines = [
+            "Local Economy Shows Growth in Q3.",
+            "Community Event Draws Large Crowds.",
+            "New Public Park Opens Downtown.",
+            "Tech Startup Announces Expansion Plans.",
+            "Sports Team Wins Regional Championship."
+        ]
+        return random.sample(headlines, min(len(headlines), 3)) # Get up to 3 random headlines
+
+    def generate_dashboard_html(self):
+        """Generates HTML content for the dashboard."""
+        # This method is now effectively deprecated if start-page.html is used for dashboard.
+        # However, it's kept for backward compatibility or if dynamic generation is still needed elsewhere.
+        local_time = self.get_local_time()
+        weather = self.get_weather_data()
+        news_items = self.get_news_headlines()
+
+        news_list_html = ""
+        if news_items:
+            news_list_html = "<ul>" + "".join([f"<li>{item}</li>" for item in news_items]) + "</ul>"
+        else:
+            news_list_html = "<p>No news available.</p>"
+
+        dashboard_html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+</head>
+<body>
+    <h1>Welcome to Your Dashboard!</h1>
+    <p>Here's a quick overview of your local information.</p>
+
+    <h2>Local Information for {self.location}</h2>
+    <ul>
+        <li><b>Current Time:</b> {local_time}</li>
+        <li><b>Weather:</b> {weather}</li>
+    </ul>
+
+    <h2>Latest News</h2>
+    {news_list_html}
+
+    <p>Type 'go <url>' to browse the web, or 'help' for other commands.</p>
+</body>
+</html>
+        """
+        return dashboard_html
+
+
 # --- Browser ---
 class Browser:
-    def __init__(self):
+    def __init__(self, debug=False): # Added debug parameter
         self.history = []
         self.current_url = None
         self.current_title = "Loading..."
-        self.parser = Parser()
         self.config_manager = ConfigManager() # Initialize ConfigManager
+        
+        # Get API key and location from config
+        weather_api_key = self.config_manager.get("weather_api_key", "")
+        weather_location = self.config_manager.get("weather_location", "Can Tho")
+
+        self.dashboard_generator = DashboardContentGenerator(
+            location=weather_location,
+            weather_api_key=weather_api_key
+        ) # Initialize dashboard generator with API key and location
+        self.parser = Parser(dashboard_generator=self.dashboard_generator) # Pass dashboard_generator to parser
         self.renderer = Renderer(self.config_manager) # Pass ConfigManager to Renderer
         self.html_generator = HtmlGenerator() # Initialize the HTML generator
         self.last_html = ""
         self._current_anchors = {} #
         self._next_anchor_id = [1] # # Use a list to make it mutable for passing by reference
+        self.debug = debug # Store debug mode setting
 
     def navigate(self, url):
         self.current_url = url
         self.history.append(url)
         self.load_content(url)
 
-    def load_content(self, url, is_config_page=False):
+    def load_content(self, url, is_internal_html=False): # Renamed is_config_page to is_internal_html for broader use
         html_content = ""
         current_lang = self.config_manager.get("language", "EN").lower() # Get current language, default to EN, convert to lowercase for filenames
 
@@ -1063,7 +1288,7 @@ class Browser:
         self._next_anchor_id = [1] # Reset anchor ID counter
 
         try:
-            if url == "home":
+            if url == "home" or url == "dashboard": # "home" and "dashboard" now point to start-page.html
                 # Try language-specific home page first
                 lang_home_path = resource_path(f"start-page-{current_lang}.html") #
                 if os.path.exists(lang_home_path):
@@ -1096,7 +1321,7 @@ class Browser:
                             html_content = f.read()
                     else:
                         raise FileNotFoundError(f"Neither {lang_test_page_path} nor {default_test_page_path} found.")
-            elif is_config_page: # For internally generated config page HTML
+            elif is_internal_html: # For internally generated HTML (like config page)
                 html_content = url # In this case, 'url' is the HTML content itself
             else:
                 # --- NEW: Fetch content from a real URL ---
@@ -1153,6 +1378,8 @@ class Browser:
             # A more robust solution would cache the parsed elements or the raw HTML.
             if self.current_url.startswith("config-page:"): # Check if it's our special config page URL
                 self._show_config_page(add_to_history=False) # Regenerate and display without adding to history again
+            elif self.current_url == "dashboard" or self.current_url == "home": # Handle going back to dashboard/home
+                self.load_content("home") # Load the home/dashboard page
             else:
                 self.load_content(self.current_url)
         else:
@@ -1235,6 +1462,9 @@ class Browser:
     <ul>
         <li><b>Enable Color:</b> {}</li>
         <li><b>Language:</b> {}</li>
+        <li><b>First Run:</b> {}</li>
+        <li><b>Weather API Key:</b> {}</li>
+        <li><b>Weather Location:</b> {}</li>
     </ul>
 
     <h2>Render Settings (1 = Enabled, 0 = Disabled)</h2>
@@ -1254,6 +1484,9 @@ class Browser:
         """
         enable_color_status = "Enabled" if self.config_manager.is_color_enabled() else "Disabled"
         current_language_setting = self.config_manager.get("language", "EN").upper() # Get and display language
+        first_run_status = "Yes" if self.config_manager.is_first_run() else "No" # Display first run status
+        weather_api_key_status = self.config_manager.get("weather_api_key", "Not Set (Simulated)")
+        weather_location_status = self.config_manager.get("weather_location", "Can Tho")
 
         render_settings_rows = []
         # Sort tags for consistent display
@@ -1262,21 +1495,30 @@ class Browser:
             status = self.config_manager.get(f"render-{tag}", "1")
             render_settings_rows.append(f"<tr><td>&lt;{tag}&gt;</td><td>{status}</td></tr>")
 
-        # Pass current_language_setting to format
-        final_html = config_html_content.format(enable_color_status, current_language_setting, "\n".join(render_settings_rows)) #
+        # Pass current_language_setting and first_run_status to format
+        final_html = config_html_content.format(
+            enable_color_status,
+            current_language_setting,
+            first_run_status,
+            weather_api_key_status, # New: Weather API Key status
+            weather_location_status, # New: Weather Location status
+            "\n".join(render_settings_rows)
+        ) #
 
         # Use a special "URL" to indicate this is an internally generated page
         if add_to_history:
             self.current_url = "config-page:current"
             self.history.append(self.current_url)
         
-        self.load_content(final_html, is_config_page=True)
+        self.load_content(final_html, is_internal_html=True)
 
 
     def handle_input(self, user_input):
         if user_input.startswith("go "):
             url = user_input[3:].strip()
             self.navigate(url)
+        elif user_input == "dashboard": # New command for dashboard
+            self.navigate("dashboard") # Now loads start-page.html
         elif user_input.startswith("test "):
             test_page = user_input[5:].strip()
             self.navigate(f"test:{test_page}")
@@ -1318,6 +1560,8 @@ class Browser:
                     # If config was successfully set, refresh the current page or show config page
                     if self.current_url and self.current_url.startswith("config-page:"):
                         self._show_config_page(add_to_history=False) # Refresh config page
+                    elif self.current_url == "dashboard" or self.current_url == "home": # If on dashboard, refresh it
+                        self.load_content("home")
                     elif self.current_url:
                         self.load_content(self.current_url) # Reload current page to apply changes
                     else:
@@ -1328,13 +1572,21 @@ class Browser:
                 print("Usage: config [option] [value]")
                 print("  config              - Show current configuration")
                 print("  config <option> <value> - Set a configuration option (e.g., config enable-color 0)")
+        elif user_input == "help": # Added help command
+            print("Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, generate <tag>, config [option] [value], click <id>, quit, help")
         else:
-            print("Unknown command. Commands: go <url>, test <test-page-name>, back, list-tests, list-languages, generate <tag>, config, click <id>, quit") # Updated help text
+            print("Unknown command. Type 'help' for a list of commands.") # Updated help text
 
     def start(self):
         print("Welcome to the TUI Web Browser!")
-        print("Commands: go <url>, test <test-page-name>, back, list-tests, list-languages, generate <tag>, config [option] [value], click <id>, quit") # Updated help text
-        self.load_content("home") # Load the start-page.html
+        print("Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, generate <tag>, config [option] [value], click <id>, quit, help") # Updated help text
+        
+        if self.config_manager.is_first_run():
+            self.navigate("home") # Load the home page for first-time users
+            self.config_manager.mark_as_not_first_run()
+        else:
+            self.navigate("dashboard") # Load the dashboard for returning users
+        
         while True:
             user_input = input("> ")
             if user_input == "quit":
@@ -1368,7 +1620,7 @@ def main():
         return
 
     if arg == "--debug":
-        browser = Browser(debug=True)
+        browser = Browser(debug=True) # Pass debug=True
         browser.start()
         return
 
@@ -1383,7 +1635,7 @@ def main():
         with open(file_path, "r", encoding="utf-8") as f:
             html = f.read()
         browser = Browser()
-        browser.load_content(html)
+        browser.load_content(html, is_internal_html=True) # Mark as internal HTML
         browser.start()
         return
 
@@ -1393,3 +1645,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

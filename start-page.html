@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌟 Browser Home - Welcome! 🌟</title>
+    <title> Welcome to BaoDWeb </title>
 </head>
 <body>
     <nav>
         <a href="home">Home</a>
+        <a href="dashboard">Dashboard</a>
         <a href="https://example.com">Example.com</a>
         <a href="test:about">About</a>
-        <a href="https://www.google.com/search?q=terminal+browser">Secrete</a>
+        <a href="https://www.google.com/search?q=terminal+browser">Secret</a>
     </nav>
 
     <h1>🚀 Welcome to Your Fancy Terminal Browser! 🚀</h1>
@@ -43,6 +44,10 @@
                 <td>Local File Browsing</td>
                 <td>Access and display local HTML files from the 'test-pages' directory.</td>
             </tr>
+            <tr>
+                <td>Dynamic Widgets</td>
+                <td>Display live time, weather, and news directly on your dashboard.</td>
+            </tr>
         </tbody>
     </table>
 
@@ -52,23 +57,30 @@
     </p>
     <ul>
         <li><code>go &lt;url&gt;</code>: Navigate to a website (e.g., <code>go example.com</code> or <code>go https://news.ycombinator.com</code>)</li>
+        <li><code>dashboard</code>: Go to your personalized dashboard with live widgets.</li>
         <li><code>test &lt;page-name&gt;</code>: Load a local HTML file from the 'test-pages' folder (e.g., <code>test features</code> to load <code>features.html</code>. The <code>.html</code> extension is optional!)</li>
         <li><code>list-tests</code>: Display a list of all available local test pages in the 'test-pages' directory.</li>
         <li><code>list-languages</code>: List available language</li>
         <li><code>config</code>: A tool help you see you configuration</li>
-        <li><code>config &lt;option&gt; &lt;value&gt;</code>: Config option, eg. config language vi - change current language to Vietnamese</li>
+        <li><code>config &lt;option&gt; &lt;value&gt;</code>: Config option, e.g., config language vi - change current language to Vietnamese</li>
         <li><code>click &lt;id show in bracket [] befor a anchor&gt;</code>: Emulating clicking a link and take you to the linked url</li>
         <li><code>back</code>: Go back to the previous page in your browsing history.</li>
         <li><code>quit</code>: Exit the browser application.</li>
         <li><code>generate &lt;tag name&gt;</code>: Generate a random test page using the given tag.</li>
     </ul>
 
+    <h2>📊 Your Live Dashboard Widgets:</h2>
+    <p>Here are some live widgets to get you started:</p>
+    <widget type="time"></widget>
+    <widget type="weather"></widget>
+    <widget type="news"></widget>
+
     <h2>🖼️ A Glimpse of Terminal Art:</h2>
     <p>Here's a small demonstration of dog image rendering:</p>
     <img src="https://picsum.photos/id/237/200/100" alt="Random Dog Image" width="200" height="100">
 
     <p>
-        Enjoy your browsing experience! Don't forget to check out the <a href="test:help">help page</a> for more details.
+        Enjoy your browsing experience! Don't forget to check out the <a href="help.html">help page</a> for more details.
     </p>
 
     <p>
@@ -76,6 +88,6 @@
     </p>
     <p>By Bao</p>
 
-    <p>Try typing "go google.com" or "list-tests" or "test features"</p>
+    <p>Try typing "go google.com" or "list-tests" or "dashboard"</p>
 </body>
 </html>
