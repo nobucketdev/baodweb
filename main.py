@@ -2,7 +2,6 @@ from __version__ import __version__
 import re
 from bs4 import BeautifulSoup, Comment, Doctype
 import sys
-from PIL import Image
 import requests
 import io
 import os # Import the os module for path manipulation
@@ -11,9 +10,10 @@ import numpy as np
 import shutil
 from wcwidth import wcswidth
 from textwrap import wrap
-from functools import lru_cache
 from datetime import datetime # Added for local time
 from collections import deque
+from utils.image_render import image_to_terminal_art # Import the image rendering function
+from ansi import *
 
 print(f"BaodWeb Terminal Browser version {__version__}")
 # --- PyInstaller Path Handling ---
@@ -28,108 +28,6 @@ def resource_path(relative_path):
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, relative_path)
 
-_ansi_fg_cache = {}
-_ansi_bg_cache = {}
-
-@lru_cache(maxsize=4096)
-def rgb_to_256_ansi(r, g, b):
-    if r == g == b:
-        if r < 8: return 16
-        if r > 248: return 231
-        return 232 + (r * 23) // 255
-    return 16 + 36 * ((r * 5) // 255) + 6 * ((g * 5) // 255) + ((b * 5) // 255)
-
-def get_cached_fg(r, g, b, true_color):
-    key = (r, g, b)
-    if true_color:
-        return f"\x1b[38;2;{r};{g};{b}m"
-    if key not in _ansi_fg_cache:
-        _ansi_fg_cache[key] = f"\x1b[38;5;{rgb_to_256_ansi(r, g, b)}m"
-    return _ansi_fg_cache[key]
-
-def get_cached_bg(r, g, b, true_color):
-    key = (r, g, b)
-    if true_color:
-        return f"\x1b[48;2;{r};{g};{b}m"
-    if key not in _ansi_bg_cache:
-        _ansi_bg_cache[key] = f"\x1b[48;5;{rgb_to_256_ansi(r, g, b)}m"
-    return _ansi_bg_cache[key]
-
-def image_to_terminal_art(image_file_or_path, target_width_pixels=None, target_height_pixels=None,
-                          max_width_chars=75, char_aspect_ratio=0.5, enable_true_color=True):
-    try:
-        img = Image.open(image_file_or_path).convert("RGB")
-    except FileNotFoundError:
-        print(f"File not found: {image_file_or_path}", file=sys.stderr)
-        return
-    except Exception as e:
-        print(f"Error opening image: {e}", file=sys.stderr)
-        return
-
-    orig_w, orig_h = img.size
-
-    if target_width_pixels and target_height_pixels:
-        width, height = target_width_pixels, target_height_pixels
-    else:
-        target_height_chars = max(1, int((orig_h / orig_w) * max_width_chars * char_aspect_ratio))
-        if target_height_chars % 2:
-            target_height_chars += 1
-        height = target_height_chars * 2
-        width = int(orig_w * (height / orig_h))
-        if width > max_width_chars:
-            width = max_width_chars
-            height = int(orig_h * (width / orig_w))
-            if height % 2:
-                height += 1
-
-    width = max(1, width)
-    height = max(2, height)
-
-    total_pixels = width * height
-    resample = Image.Resampling.NEAREST if total_pixels < 10000 else Image.Resampling.LANCZOS
-    img = img.resize((width, height), resample)
-
-    arr = np.array(img)
-    top_rows = arr[::2]
-    bottom_rows = arr[1::2]
-
-    output = []
-    for top, bottom in zip(top_rows, bottom_rows):
-        line = []
-        for t, b in zip(top, bottom):
-            fg = get_cached_fg(*b, enable_true_color)
-            bg = get_cached_bg(*t, enable_true_color)
-            line.append(fg + bg + "▄")
-        output.append("".join(line) + RESET)
-
-    print("\n".join(output))
-
-# --- ANSI Escape Codes (for easier reference) ---
-RESET = "\x1b[0m"
-BOLD = "\x1b[1m"
-UNDERLINE = "\x1b[4m"
-ITALIC = "\x1b[3m"
-STRIKETHROUGH = "\x1b[9m"
-
-# Foreground Colors
-BLACK_FG = "\x1b[30m"
-RED_FG = "\x1b[31m"
-GREEN_FG = "\x1b[32m"
-YELLOW_FG = "\x1b[33m"
-BLUE_FG = "\x1b[34m"
-MAGENTA_FG = "\x1b[35m"
-CYAN_FG = "\x1b[36m"
-WHITE_FG = "\x1b[37m"
-
-# Background Colors
-BLACK_BG = "\x1b[40m"
-RED_BG = "\x1b[41m"
-GREEN_BG = "\x1b[42m"
-YELLOW_BG = "\x1b[43m"
-BLUE_BG = "\x1b[34m"
-MAGENTA_BG = "\x1b[45m"
-CYAN_BG = "\x1b[46m"
-WHITE_BG = "\x1b[47m"
 
 class Anchor:
     def __init__(self, text, href, current_anchors, next_anchor_id): #
@@ -147,9 +45,10 @@ class Anchor:
             # Removed leading/trailing spaces.
             # The color and underline styling will now apply *only* to the text content.
             return f"[{self.anchor_id}] {BLUE_FG}{UNDERLINE}{self.text.strip()}{RESET}" #
-        # Also remove spaces from the non-colored fallback.
+            # Also remove spaces from the non-colored fallback.
         return f"[{self.anchor_id}] {self.text.strip()} [{self.href}]" #
     
+
 class TextNode:
     def __init__(self, text):
         self.text = text
@@ -157,6 +56,62 @@ class TextNode:
 
     def render(self, enable_color=True):
         return self.text
+
+class Title:
+    def __init__(self, text):
+        self.text = text
+        self.tag_type = 'title'
+
+    def _visible_width(self, text):
+        """Compute display width excluding ANSI codes."""
+        clean_text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+        return wcswidth(clean_text)
+
+    def render(self, enable_color=True):
+        # Determine the maximum width based on terminal size or a sensible default
+        terminal_width = shutil.get_terminal_size((80, 20)).columns
+        
+        # Calculate available width for the title text within the box
+        # Box borders and padding: '╭' + '─' + 2 spaces + text + 2 spaces + '─' + '╮'
+        # Total fixed width = 1 (corner) + 1 (line) + 2 (padding) + 2 (padding) + 1 (line) + 1 (corner) = 8
+        fixed_width_for_box = 6 # Account for '╭─  ' and '  ─╮'
+        max_text_width = terminal_width - fixed_width_for_box - 2 # -2 for the side borders themselves '│'
+
+        # Render the text with potential color and bold, and get its visible width
+        styled_text = f"{BOLD}{CYAN_FG}{self.text}{RESET}" if enable_color else self.text
+        text_visible_width = self._visible_width(styled_text)
+
+        # Wrap the text if it exceeds the maximum allowed width
+        wrapped_lines = wrap(styled_text, max_text_width, drop_whitespace=False, break_long_words=False)
+        
+        # Determine the actual width needed for the box based on the longest wrapped line
+        # Use the visible width of the longest line to size the box correctly
+        actual_content_width = 0
+        if wrapped_lines:
+            actual_content_width = max(self._visible_width(line) for line in wrapped_lines)
+
+        # Ensure a minimum width for the box even if text is very short or empty
+        min_box_width = 10 # Example minimum width
+        box_inner_width = max(actual_content_width, min_box_width)
+
+        # Construct the box components
+        top_border = f"╭{'─' * (box_inner_width + 4)}╮" # 2 spaces padding on each side
+        bottom_border = f"╰{'─' * (box_inner_width + 4)}╯"
+
+        middle_lines = []
+        for line in wrapped_lines:
+            # Calculate padding for centering
+            current_line_visible_width = self._visible_width(line)
+            # Pad on the right to match the `box_inner_width`, then add the 2 spaces for visual padding
+            padding_right = box_inner_width - current_line_visible_width + 2
+            middle_lines.append(f"│  {line}{' ' * padding_right}│")
+
+        # If no text, ensure at least an empty line in the middle
+        if not middle_lines:
+            middle_lines.append(f"│{' ' * (box_inner_width + 4)}│")
+
+        return f"{top_border}\n" + "\n".join(middle_lines) + f"\n{bottom_border}\n"
+
 
 class Paragraph:
     def __init__(self, content_parts):
@@ -550,9 +505,9 @@ class WidgetElement:
         return "\n".join(rendered_widget) + "\n"
 
 SUPPORTED_TAGS = {'html', 'body', 'section', 'article', 'main', 'div',
-                  'h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'a', 'button', 'img', 'nav',
-                  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'span',
-                  'widget'} # Added 'widget' here
+                'h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'a', 'button', 'img', 'nav',
+                'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'span',
+                'widget', 'title'} # Added 'widget' and 'title' here
 
 class Parser:
     def __init__(self, dashboard_generator=None): # Pass dashboard_generator to parser
@@ -581,16 +536,23 @@ class Parser:
         return "".join(converted_chars)
 
     def parse(self, html, current_anchors=None, next_anchor_id=None): #
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, 'lxml')
         elements = []
         page_title = "No Title"
 
         title_tag = soup.find('title')
         if title_tag:
             page_title = title_tag.get_text(strip=True)
+            # Add the Title object to the elements list for rendering
+            elements.append(Title(page_title)) 
 
         root = soup.find('html') or soup
-        elements.extend(self.parse_element(root, current_anchors, next_anchor_id)) #
+        # Filter out the 'title' tag from being parsed as a generic text node
+        # We handle it specifically above.
+        for child in root.children:
+            if child.name == 'title':
+                continue
+            elements.extend(self.parse_element(child, current_anchors, next_anchor_id)) 
         return elements, page_title
 
     def parse_element(self, tag, current_anchors=None, next_anchor_id=None): #
@@ -612,9 +574,13 @@ class Parser:
         # Handle elements by tag name
         tag_name = tag.name.lower()
 
-        if tag.name.lower() in ['style', 'script', 'noscript']:
+        if tag_name in ['style', 'script', 'noscript']:
             # Ignore content inside these tags completely
             return []
+        
+        if tag_name == 'title': # Handle title tag specifically for rendering
+            title_text = tag.get_text(strip=True)
+            return [Title(title_text)]
 
         if tag_name in ['h1', 'h2', 'h3']:
             return [Heading(tag.get_text(strip=True), level=int(tag_name[1]))]
@@ -764,7 +730,7 @@ class Parser:
             elif hasattr(content_node, 'name'):
                 tag_name = content_node.name.lower()
 
-                if tag_name in {'script', 'style', 'noscript'}:
+                if tag_name in {'script', 'style', 'noscript', 'title'}: # Ensure title is skipped here too
                     continue
 
                 elif tag_name == 'a':
@@ -839,111 +805,6 @@ class Parser:
 
         return parsed_inline_elements
 
-# --- HTML Generator ---
-class HtmlGenerator:
-    def generate_random_page_with_tag(self, tag_name):
-        title = f"Test {tag_name.capitalize()}"
-        header_text = f"Test {tag_name.capitalize()} Page"
-
-        body_content = []
-
-        # Add a heading
-        body_content.append(f"<h1>{header_text}</h1>")
-
-        # Add a paragraph
-        body_content.append("<p>This is a dynamically generated page featuring the "
-                            f"<code>&lt;{tag_name}&gt;</code> tag.</p>")
-
-        # Add the specific tag with some generic content
-        if tag_name == 'p':
-            body_content.append("<p>This is a paragraph generated dynamically. "
-                                "Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>")
-        elif tag_name == 'a':
-            body_content.append("<p><a href='https://www.example.com'>Click me - a dynamically generated link!</a></p>")
-            body_content.append("<p>Another link: <a href='https://www.google.com'>Google</a></p>")
-        elif tag_name == 'ul':
-            items = [f"<li>Item {i} {random.choice(['Alpha', 'Beta', 'Gamma'])}</li>" for i in range(1, random.randint(3, 6))]
-            body_content.append(f"<ul>{''.join(items)}</ul>")
-        elif tag_name == 'ol':
-            items = [f"<li>Ordered Item {i} {random.choice(['One', 'Two', 'Three'])}</li>" for i in range(1, random.randint(3, 6))]
-            body_content.append(f"<ol>{''.join(items)}</ol>")
-        elif tag_name == 'button':
-            body_content.append("<button>Dynamic Button</button>")
-        elif tag_name == 'img':
-            # Use a placeholder image URL
-            body_content.append('<img src="https://via.placeholder.com/150" alt="Placeholder Image" width="150" height="150">')
-        elif tag_name == 'table':
-            num_rows = random.randint(2, 4)
-            num_cols = random.randint(2, 3)
-            table_html = "<table><thead><tr>"
-            for c in range(num_cols):
-                table_html += f"<th>Header {c+1}</th>"
-            table_html += "</tr></thead><tbody>"
-            for r in range(num_rows):
-                table_html += "<tr>"
-                for c in range(num_cols):
-                    table_html += f"<td>Row {r+1}, Col {c+1}</td>"
-                table_html += "</tr>"
-            table_html += "</tbody></table>"
-            body_content.append(table_html)
-        elif tag_name == 'h1':
-            body_content.append("<h1>This is a dynamically generated H1 heading.</h1>")
-        elif tag_name == 'h2':
-            body_content.append("<h2>This is a dynamically generated H2 heading.</h2>")
-        elif tag_name == 'h3':
-            body_content.append("<h3>This is a dynamically generated H3 heading.</h3>")
-        elif tag_name == 'strong' or tag_name == 'b':
-            body_content.append("<p>This sentence contains <strong>bold text</strong> generated.</p>")
-        elif tag_name == 'em' or tag_name == 'i':
-            body_content.append("<p>This sentence contains <em>italic text</em> generated.</p>")
-        elif tag_name == 'u':
-            body_content.append("<p>This sentence contains <u>underlined text</u> generated.</p>")
-        elif tag_name == 'del':
-            body_content.append("<p>This sentence contains <del>deleted text</del> generated.</p>")
-        elif tag_name == 'ins':
-            body_content.append("<p>This sentence contains <ins>inserted text</ins> generated.</p>")
-        elif tag_name == 'mark':
-            body_content.append("<p>This sentence contains <mark>highlighted text</mark> generated.</p>")
-        elif tag_name == 'sub':
-            body_content.append("<p>This is H<sub>2</sub>O with a subscript.</p>")
-        elif tag_name == 'sup':
-            body_content.append("<p>This is X<sup>2</sup> + Y<sup>3</sup> with superscripts.</p>")
-        elif tag_name == 'div':
-            body_content.append("<div>A dynamically generated div with a <p>paragraph inside.</p></div>")
-        elif tag_name == 'nav':
-            body_content.append("<nav><a href='#'>Nav Link 1</a> <a href='#'>Nav Link 2</a></nav>")
-        elif tag_name == 'section':
-            body_content.append("<section><h2>Dynamic Section</h2><p>Content within a section.</p></section>")
-        elif tag_name == 'article':
-            body_content.append("<article><h2>Dynamic Article</h2><p>Content within an article.</p></article>")
-        elif tag_name == 'main':
-            body_content.append("<main><h2>Dynamic Main Content</h2><p>Content within the main tag.</p></main>")
-        elif tag_name == 'li': # For direct li generation, mostly for internal use, but can be added
-            body_content.append("<li>A standalone list item. Usually found in ul/ol.</li>")
-        elif tag_name == 'th': # For direct th generation, mostly for internal use
-            body_content.append("<th>A standalone table header cell.</th>")
-        elif tag_name == 'td': # For direct td generation, mostly for internal use
-            body_content.append("<td>A standalone table data cell.</td>")
-        elif tag_name == 'widget': # New: Generate a sample widget
-            body_content.append('<widget type="time"></widget>')
-            body_content.append('<widget type="weather"></widget>')
-            body_content.append('<widget type="news"></widget>')
-        else:
-            # For other unsupported or generic tags, just add a simple instance of it
-            body_content.append(f"<{tag_name}>Content for {tag_name} tag.</{tag_name}>")
-
-        html_template = f"""
-<!DOCTYPE html>
-<html>
-<head>
-    <title>{title}</title>
-</head>
-<body>
-    {''.join(body_content)}
-</body>
-</html>
-        """
-        return html_template
 
 # --- ConfigManager ---
 class ConfigManager:
@@ -1083,40 +944,21 @@ class Renderer:
 
     def render(self, elements, title=None):
         enable_color = self.config_manager.is_color_enabled()
-
-        if title:
-            # Unicode rounded box drawing characters
-            top_left = '╭'
-            top_right = '╮'
-            bottom_left = '╰'
-            bottom_right = '╯'
-            horizontal = '─'
-            vertical = '│'
-    
-            # Calculate padding and total width
-            # 4 spaces on each side of the title within the box
-            padding_internal = 4 
-            # Total width of the horizontal line including 2 for the spaces next to the vertical lines
-            total_line_width = len(title) + (padding_internal * 2) + 2 
-
-            if enable_color:
-                # Top border
-                print(f"{BOLD}{CYAN_FG}{top_left}{horizontal * total_line_width}{top_right}{RESET}")
-                # Title line
-                # Note: UNDERLINE is applied to the title text itself if you want it, not the box.
-                print(f"{BOLD}{CYAN_FG}{vertical}{' ' * padding_internal} {title}{RESET}{BOLD}{CYAN_FG} {' ' * padding_internal}{vertical}{RESET}")
-                # Bottom border
-                print(f"{BOLD}{CYAN_FG}{bottom_left}{horizontal * total_line_width}{bottom_right}{RESET}")
+        
+        # Render the title first if it exists in the elements and is enabled
+        title_element = None
+        other_elements = []
+        for element in elements:
+            if isinstance(element, Title):
+                title_element = element
             else:
-                # Top border
-                print(f"{top_left}{horizontal * total_line_width}{top_right}")
-                # Title line
-                print(f"{vertical}{' ' * padding_internal} {title} {' ' * padding_internal}{vertical}")
-                # Bottom border
-                print(f"{bottom_left}{horizontal * total_line_width}{bottom_right}")
+                other_elements.append(element)
+        
+        if title_element and self.config_manager.should_render_tag('title'):
+            print(title_element.render(enable_color), end='')
 
-        # Recursively render elements, applying tag filtering
-        self._render_elements_recursive(elements, enable_color)
+        # Then render the rest of the elements
+        self._render_elements_recursive(other_elements, enable_color)
 
 
     def _render_elements_recursive(self, elements, enable_color):
@@ -1269,7 +1111,6 @@ class Browser:
         ) # Initialize dashboard generator with API key and location
         self.parser = Parser(dashboard_generator=self.dashboard_generator) # Pass dashboard_generator to parser
         self.renderer = Renderer(self.config_manager) # Pass ConfigManager to Renderer
-        self.html_generator = HtmlGenerator() # Initialize the HTML generator
         self.last_html = ""
         self._current_anchors = {} #
         self._next_anchor_id = [1] # # Use a list to make it mutable for passing by reference
@@ -1522,16 +1363,6 @@ class Browser:
         elif user_input.startswith("test "):
             test_page = user_input[5:].strip()
             self.navigate(f"test:{test_page}")
-        elif user_input.startswith("generate "): # New command to generate HTML
-            tag_name = user_input[len("generate "):].strip().lower()
-            if tag_name in SUPPORTED_TAGS:
-                generated_html = self.html_generator.generate_random_page_with_tag(tag_name)
-                elements, page_title = self.parser.parse(generated_html, self._current_anchors, self._next_anchor_id) #
-                self.current_title = page_title
-                self.renderer.refresh(elements, self.current_title)
-            else:
-                print(f"Cannot generate content for unsupported tag: '{tag_name}'.")
-                print(f"Supported tags for generation: {', '.join(sorted(list(SUPPORTED_TAGS)))}")
         elif user_input.startswith("click "): # Handle click command
             try:
                 anchor_id = int(user_input[len("click "):].strip()) #
@@ -1573,13 +1404,13 @@ class Browser:
                 print("  config              - Show current configuration")
                 print("  config <option> <value> - Set a configuration option (e.g., config enable-color 0)")
         elif user_input == "help": # Added help command
-            print("Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, generate <tag>, config [option] [value], click <id>, quit, help")
+            print("Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, config [option] [value], click <id>, quit, help")
         else:
             print("Unknown command. Type 'help' for a list of commands.") # Updated help text
 
     def start(self):
         print("Welcome to the TUI Web Browser!")
-        print("Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, generate <tag>, config [option] [value], click <id>, quit, help") # Updated help text
+        print("Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, config [option] [value], click <id>, quit, help") # Updated help text
         
         if self.config_manager.is_first_run():
             self.navigate("home") # Load the home page for first-time users
@@ -1645,4 +1476,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
