@@ -4,6 +4,27 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 ---
 
+## 1.1.1 — Bug Cleanup & Render Refactor  
+**Release Date:** July 27, 2025  
+
+### ✦ What's Fixed
+
+* **🐛 Double Title Bug:** Fixed an issue where `title` elements were rendered **twice** due to overlapping logic in the main render flow and separate title rendering. Titles now appear once, clean and correct.
+
+* **🪝 Anchor-In-Container Fix:** Anchors inside wrapped containers (like `<table>`) no longer cause layout glitches. They now behave more predictably in block and inline contexts.
+
+### 🛠 Refactoring & Structure
+
+* **🧩 Code Modularization:**  
+  * Moved ANSI formatting to `ansi.py`  
+  * Moved image rendering logic to `utils/image_render.py`  
+  This makes future maintenance easier and separates concerns cleanly.
+
+* **📄 Project Structure Enhancements:**  
+  * Added missing project docs: `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md` — making this project ready for contributors and safer for public use.
+
+---
+
 ## 1.1.0 — Dynamic Dashboard & Clickable Magic
 **Release Date:** July 26, 2025
 
