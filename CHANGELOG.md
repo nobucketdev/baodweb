@@ -4,6 +4,22 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 ---
 
+## 1.1.2 — Style Polish & Render Boost  
+**Release Date:** July 28, 2025  
+
+### ✦ What's Improved
+
+* **⠿ Braille-Style Headings:** Headings are now styled using simplified Braille characters.
+
+* **🎨 Terminal UI Polish:** Refined visual styling for core elements, making the terminal output cleaner and easier to read.
+
+* **⚡ Faster, better Image Rendering:** Minor performance boost in image rendering. Using Lanczos resampling algorithm for better image quality, less pixelated.
+
+* **📄 Another Code Structuring Chage:** All code except `main.py` are moved to `core/` for better control.
+
+---
+
+
 ## 1.1.1 — Bug Cleanup & Render Refactor  
 **Release Date:** July 27, 2025  
 

@@ -1,0 +1,5 @@
+beautifulsoup4==4.13.4
+numpy==2.3.2
+Pillow==11.3.0
+Requests==2.32.4
+wcwidth==0.2.13

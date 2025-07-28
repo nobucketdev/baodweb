@@ -8,5 +8,7 @@ __pycache__/
 .venv/
 .env
 config
+config.ini
 .vscode/
 test.py
+setup.py
