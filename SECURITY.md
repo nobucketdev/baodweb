@@ -4,11 +4,11 @@
 
 BaodWeb is currently in early development. Only the latest release is actively maintained and eligible for security updates.
 
-| Version  | Supported        |
-|----------|------------------|
-| 1.1.0    | Yes              |
-| 1.0.0    | Yes              |
-| < 1.0.0  | No               |
+| Version       | Supported        |
+|---------------|------------------|
+| 1.1.0 - 1.1.2 | Yes              |
+| 1.0.0         | Yes              |
+| < 1.0.0       | No               |
 
 ---
 

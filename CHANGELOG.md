@@ -3,6 +3,43 @@
 All notable changes to **BaodWeb** will be documented in this file.
 
 ---
+## 1.2.0 — Layout & Render Overhaul  
+**Release Date:** July 30, 2025
+
+## ✦ What's New
+
+### 📏 Just-Fit Terminal Rendering  
+The browser now intelligently adjusts content rendering to *precisely fit* your terminal's height — no more chopped-off content. It’s all tight, all clean.
+
+### 🧭 Command and Title Bars
+
+- **Bottom Command Bar:**  
+  A persistent command input bar now stick at the very bottom of the terminal.
+
+- **Top Title Bar:**  
+  A dedicated title bar is now fixed at the top of the screen, showing the current page’s title to make navigation more intuitive.
+
+- **📝 "About" Page:**  
+  New `about.html` available! Type `test about` or `click 4` on dashboard to open.
+
+## ⚡ Performance & Stability
+
+- **Optimized Rendering:**  
+  Major speed boosts and smoother rendering.
+
+- **Minor Issue Fixes:**  
+  Patched various bugs and annoying glitches. Overall UX is now less janky and more joyful.
+
+## ⚠️ Known Issues
+
+- **List-Table Layout Conflict:**  
+  List like `<ul>` or `<ol>` inside table cells (`<td>`) may break alignment. Expect a bit of chaos if you do that.
+
+- **Alt Text Duplication on Scroll:**  
+  Sometimes, scrolling causes long `alt` texts to show up twice.
+
+---
+
 
 ## 1.1.2 — Style Polish & Render Boost  
 **Release Date:** July 28, 2025  
