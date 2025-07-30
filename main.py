@@ -134,8 +134,8 @@ class Renderer:
 
             if current_line != previous_line:
                 # Move cursor to the start of the current content line
-                # +4 because content starts on line 4 (after 3 title lines)
-                sys.stdout.write(f"\033[{i + 4};1H")
+                # +3 because content starts on line 3 (after 2 title lines)
+                sys.stdout.write(f"\033[{i + 3};1H")
                 sys.stdout.write(current_line)
                 # Clear to end of line if the new line is shorter than the old one
                 if len(current_line) < len(previous_line):
