@@ -7,14 +7,15 @@ from datetime import datetime
 import requests
 from core.configman import ConfigManager
 from core.parser import SUPPORTED_TAGS, Parser
+from core.search import hybrid_search # Assuming search_engine.py is in the same directory
 
 if os.name == "nt":
     import msvcrt
 else:
     import termios
     import tty
-print("------ BaodWeb Terminal Browser -------")
-print(f"BaodWeb Terminal Browser version 1.2.0")
+print("────── BaodWeb Terminal Browser ───────")
+print(f"BaodWeb Terminal Browser version 1.2.1")
 
 
 def resource_path(relative_path):
@@ -393,6 +394,10 @@ class Browser:
                 self._show_config_page(add_to_history=False)
             elif self.current_url == "dashboard" or self.current_url == "home":
                 self.load_content("home")
+            elif self.current_url.startswith("search-results:"): # Handle going back from search
+                # Re-run search query
+                query = self.current_url[len("search-results:"):]
+                self.handle_search_results(query, add_to_history=False)
             else:
                 self.load_content(self.current_url)
         else:
@@ -520,6 +525,53 @@ class Browser:
             self.history.append(self.current_url)
         self.load_content(final_html, is_internal_html=True)
 
+    def handle_search_results(self, query, add_to_history=True):
+        print(f"Searching for '{query}'...")
+        results, engine_used = hybrid_search(query)
+
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Results for '{query}'</title>
+</head>
+<body>
+    <h1>Search Results for "{query}"</h1>
+    <p>Search performed using: {engine_used}</p>
+    <hr/>
+"""
+        if results:
+            html_content += "<ul>"
+            for i, result in enumerate(results):
+                title = result.get('title', 'No Title')
+                url = result.get('url', '#')
+                snippet = result.get('snippet', 'No snippet available.')
+                # Assign an anchor ID to each search result for clicking
+                anchor_id = self._next_anchor_id[0]
+                self._current_anchors[anchor_id] = type('obj', (object,), {'text': title, 'href': url})()
+                self._next_anchor_id[0] += 1
+
+                html_content += f"""
+                <li>
+                    <h3><a href="{url}">{title}</a> [<a href="cmd:click {anchor_id}">click {anchor_id}</a>]</h3>
+                    <p>{snippet}</p>
+                    <p><small>{url}</small></p>
+                </li>
+                """
+            html_content += "</ul>"
+        else:
+            html_content += "<p>No search results found.</p>"
+
+        html_content += """
+    <p>Type 'go &lt;url&gt;', 'click &lt;id&gt;', or 'back' to navigate.</p>
+</body>
+</html>
+"""
+        if add_to_history:
+            self.current_url = f"search-results:{query}"
+            self.history.append(self.current_url)
+        self.load_content(html_content, is_internal_html=True)
+
     def handle_input(self, user_input):
         if user_input in ("up", "k"):
             self.scroll_up()
@@ -528,6 +580,12 @@ class Browser:
         elif user_input.startswith("go "):
             url = user_input[3:].strip()
             self.navigate(url)
+        elif user_input.startswith("search "):
+            query = user_input[len("search "):].strip()
+            self.handle_search_results(query)
+        elif user_input.startswith("s "): # Shortcut for search
+            query = user_input[len("s "):].strip()
+            self.handle_search_results(query)
         elif user_input == "dashboard":
             self.navigate("dashboard")
         elif user_input.startswith("test "):
@@ -580,7 +638,7 @@ class Browser:
                 )
         elif user_input == "help":
             print(
-                "Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, config [option] [value], click <id>, up, down, quit, help"
+                "Commands: go <url>, search <query>, s <query>, dashboard, test <test-page-name>, back, list-tests, list-languages, config [option] [value], click <id>, up, down, quit, help"
             )
         else:
             print("Unknown command. Type 'help' for a list of commands.")
@@ -588,7 +646,7 @@ class Browser:
     def start(self):
         print("Welcome to the TUI Web Browser!")
         print(
-            "Commands: go <url>, dashboard, test <test-page-name>, back, list-tests, list-languages, config [option] [value], click <id>, up, down, quit, help"
+            "Commands: go <url>, search <query>, s <query>, dashboard, test <test-page-name>, back, list-tests, list-languages, config [option] [value], click <id>, up, down, quit, help"
         )
 
         # Initial clear and render

@@ -1,7 +1,7 @@
 import sys
 from bs4 import BeautifulSoup, Comment, Doctype
 import re
-from core.elements import *
+from core.elements import * # Assuming core.elements contains all your Element classes
 import lxml
 
 SUPPORTED_TAGS = {
@@ -45,13 +45,55 @@ class Parser:
             page_title = title_tag.get_text(strip=True)
             elements.append(Title(page_title))
 
-        root = soup.find('html') or soup
-        for child in root.children:
-            if getattr(child, 'name', None) == 'title':
-                continue
-            elements.extend(self.parse_element(child, current_anchors, next_anchor_id))
+        root = soup.find('html') or soup.find('body') or soup
 
-        return elements, page_title
+        # Initialize lists for different sections
+        nav_elements = []
+        header_elements = []
+        main_elements = []
+        footer_elements = []
+        other_elements = []
+
+        # Find specific sections and parse them
+        nav_tag = root.find('nav', recursive=True)
+        if nav_tag:
+            nav_elements.extend(self.parse_element(nav_tag, current_anchors, next_anchor_id))
+
+        header_tag = root.find('header', recursive=True)
+        if header_tag:
+            header_elements.extend(self.parse_element(header_tag, current_anchors, next_anchor_id))
+
+        main_tag = root.find('main', recursive=True)
+        if main_tag:
+            # Parse only direct children of 'main' to avoid re-parsing nav/header/footer if they are inside main
+            for child in main_tag.children:
+                main_elements.extend(self.parse_element(child, current_anchors, next_anchor_id))
+        else:
+            # If no explicit 'main' tag, parse top-level children that are not nav, header, or footer
+            for child in root.children:
+                if getattr(child, 'name', None) not in ['nav', 'header', 'footer', 'title', 'script', 'style', 'noscript']:
+                    other_elements.extend(self.parse_element(child, current_anchors, next_anchor_id))
+
+
+        footer_tag = root.find('footer', recursive=True)
+        if footer_tag:
+            footer_elements.extend(self.parse_element(footer_tag, current_anchors, next_anchor_id))
+            
+        # Assemble elements in the desired order
+        final_elements = []
+        # Add page title first if it exists
+        for el in elements:
+            if isinstance(el, Title):
+                final_elements.append(el)
+                break
+        
+        final_elements.extend(nav_elements)
+        final_elements.extend(header_elements)
+        final_elements.extend(main_elements if main_elements else other_elements) # Use main_elements if present, else other
+        final_elements.extend(footer_elements)
+
+
+        return final_elements, page_title
 
     def parse_element(self, tag, current_anchors=None, next_anchor_id=None):
         if isinstance(tag, str):

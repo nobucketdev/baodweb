@@ -399,56 +399,58 @@ class Nav:
         if not self.elements:
             return ""
 
-        # Render each element and store its visible width
+        terminal_width = shutil.get_terminal_size((100, 20)).columns
+
+        # Render and measure nav items
         rendered_parts_info = []
         for element in self.elements:
             rendered_text = element.render(enable_color).strip()
             visible_w = self._visible_width(rendered_text)
             rendered_parts_info.append((rendered_text, visible_w))
 
-        # Define the desired padding (2 characters on each side)
-        padding_chars_per_side = 2
-        total_padding_per_cell = padding_chars_per_side * 2
+        num_items = len(rendered_parts_info)
+        min_padding = 2
+        inner_borders = num_items - 1
+        outer_borders = 2
 
-        # Determine maximum width for each "column" (each nav item)
-        # Add the total_padding_per_cell to the content width, with a minimum overall width
-        padded_column_widths = [max(info[1] + total_padding_per_cell, 9) for info in rendered_parts_info] # Min width 5 + 4 padding = 9
+        total_text_width = sum(w for _, w in rendered_parts_info)
+        base_cell_widths = [
+            w + 2 * min_padding for _, w in rendered_parts_info
+        ]
+        base_total = sum(base_cell_widths) + inner_borders + outer_borders
 
-        # Calculate total width of the "table" for the borders
-        # This calculation relies on `padded_column_widths` representing the full width including separators
-        total_width = sum(padded_column_widths) + (len(padded_column_widths) - 1) + 2 # Sum of widths + (num_cols - 1) for inner separators + 2 for outer borders (left/right)
+        extra_space = max(0, terminal_width - base_total)
 
-        # Construct border lines using Unicode characters
-        def make_border(left_char, mid_char, right_char, fill_char):
-            # Corrected: fill_char repeated by its full padded width (w)
-            # The mid_char joins these full-width segments.
-            return left_char + mid_char.join(fill_char * w for w in padded_column_widths) + right_char
+        # Distribute remaining space across cells (left to right)
+        extra_per_cell = [0] * num_items
+        for i in range(extra_space):
+            extra_per_cell[i % num_items] += 1  # distribute evenly
+
+        padded_column_widths = [
+            base + extra for base, extra in zip(base_cell_widths, extra_per_cell)
+        ]
+
+        def make_border(left, mid, right, fill):
+            return left + mid.join(fill * w for w in padded_column_widths) + right
 
         top_border = make_border("╭", "┬", "╮", "─")
         bottom_border = make_border("╰", "┴", "╯", "─")
-
         output_lines = [top_border]
 
-        # Render content row (this will always be a single row)
+        # Center content inside each cell
         content_cells = []
         for i, (text, visible_w) in enumerate(rendered_parts_info):
-            # Calculate padding needed for the right side
-            # Total cell width - visible text width - padding on left side
-            right_pad_len = padded_column_widths[i] - visible_w - padding_chars_per_side
+            cell_width = padded_column_widths[i]
+            total_padding = cell_width - visible_w
+            left_pad = total_padding // 2
+            right_pad = total_padding - left_pad
+            cell_text = f"{text}{RESET if enable_color else ''}"
+            content_cells.append(" " * left_pad + cell_text + " " * right_pad)
 
-            # Apply color to the text within the cell
-            cell_text = f"{YELLOW_FG if enable_color else ''}{text}{RESET if enable_color else ''}"
-
-            # Pad the cell and add to list of content cells for this row
-            content_cells.append(f"{' ' * padding_chars_per_side}{cell_text}{' ' * right_pad_len}")
-
-        # Join the content cells with the vertical separator
         output_lines.append("│" + "│".join(content_cells) + "│")
         output_lines.append(bottom_border)
 
         return "\n".join(output_lines) + "\n"
-
-# New WidgetElement class
 class WidgetElement:
     def __init__(self, widget_type, dashboard_generator):
         self.widget_type = widget_type
@@ -488,10 +490,11 @@ class WidgetElement:
         rendered_widget.append(bottom_border)
         
         return "\n".join(rendered_widget) + "\n"
-class Header:
-    def __init__(self, elements):
+class BoxedContent:
+    def __init__(self, elements, tag_type, border_color_code=WHITE_FG):
         self.elements = elements
-        self.tag_type = 'header'
+        self.tag_type = tag_type
+        self.border_color_code = border_color_code
 
     def render(self, enable_color=True):
         rendered_children = []
@@ -505,63 +508,31 @@ class Header:
         if not content:
             return ""
 
-        border_color = CYAN_FG if enable_color else ""
+        border_color = self.border_color_code if enable_color else ""
         reset = RESET if enable_color else ""
 
         lines = content.split('\n')
-        term_width = shutil.get_terminal_size((100, 20)).columns
+        term_width = shutil.get_terminal_size(fallback=(100, 20)).columns
         padded_lines = []
 
         for line in lines:
             line_stripped = re.sub(r'\x1b\[[0-9;]*m', '', line)
             line_width = wcswidth(line_stripped)
-            total_padding = term_width - 4 - line_width
+            total_padding = term_width - 4 - line_width  # 4 for "│ " and " │"
             left_pad = total_padding // 2
             right_pad = total_padding - left_pad
             padded_lines.append(
                 f"{border_color}│ {reset}{' ' * left_pad}{line}{' ' * right_pad}{border_color} │{reset}"
             )
 
-        top = f"{border_color}╭{'─' * (term_width - 2)}╮{reset}"
-        bottom = f"{border_color}╰{'─' * (term_width - 2)}╯{reset}"
+        top_border = f"{border_color}╭{'─' * (term_width - 2)}╮{reset}"
+        bottom_border = f"{border_color}╰{'─' * (term_width - 2)}╯{reset}"
+        return "\n".join([top_border] + padded_lines + [bottom_border]) + "\n"
 
-        return "\n".join([top] + padded_lines + [bottom]) + "\n"
-
-class Footer:
+class Header(BoxedContent):
     def __init__(self, elements):
-        self.elements = elements
-        self.tag_type = 'footer'
+        super().__init__(elements, 'header', border_color_code=BLUE_FG) 
 
-    def render(self, enable_color=True):
-        rendered_children = []
-        for element in self.elements:
-            rendered = element.render(enable_color)
-            if not rendered.endswith('\n'):
-                rendered += '\n'
-            rendered_children.append(rendered)
-
-        content = "".join(rendered_children).strip()
-        if not content:
-            return ""
-
-        border_color = MAGENTA_FG if enable_color else ""
-        reset = RESET if enable_color else ""
-
-        lines = content.split('\n')
-        term_width = shutil.get_terminal_size((100, 20)).columns
-        padded_lines = []
-
-        for line in lines:
-            line_stripped = re.sub(r'\x1b\[[0-9;]*m', '', line)
-            line_width = wcswidth(line_stripped)
-            total_padding = term_width - 4 - line_width
-            left_pad = total_padding // 2
-            right_pad = total_padding - left_pad
-            padded_lines.append(
-                f"{border_color}│ {reset}{' ' * left_pad}{line}{' ' * right_pad}{border_color} │{reset}"
-            )
-
-        top = f"{border_color}╭{'─' * (term_width - 2)}╮{reset}"
-        bottom = f"{border_color}╰{'─' * (term_width - 2)}╯{reset}"
-
-        return "\n".join([top] + padded_lines + [bottom]) + "\n"
+class Footer(BoxedContent):
+    def __init__(self, elements):
+        super().__init__(elements, 'footer')
