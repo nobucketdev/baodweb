@@ -134,14 +134,21 @@ class ListElement:
         self.items_content_parts = items_content_parts
         self.tag_type = 'ul' # Added tag_type
 
-    def render(self, enable_color=True):
+    def render(self, enable_color=True, inline=False):
         bullet_style = f"{CYAN_FG}" if enable_color else ""
         rendered_items = []
         for item_parts in self.items_content_parts:
             # Render the content of each list item
-            item_text = "".join(part.render(enable_color) for part in item_parts)
+            item_text = "".join(
+                part.render(enable_color, inline=True) if hasattr(part, "render") and "inline" in part.render.__code__.co_varnames
+                else part.render(enable_color) if hasattr(part, "render")
+                else str(part)
+                for part in item_parts
+            )
             rendered_items.append(f"{bullet_style}•{RESET if enable_color else ''} {item_text}")
 
+        if inline:
+            return ", ".join(rendered_items)
         return "\n".join(rendered_items) + "\n"
 
 class NumberedListElement:
@@ -149,12 +156,19 @@ class NumberedListElement:
         self.items_content_parts = items_content_parts
         self.tag_type = 'ol' # Added tag_type
 
-    def render(self, enable_color=True):
+    def render(self, enable_color=True, inline=False):
         numbered_style = f"{MAGENTA_FG}" if enable_color else ""
         rendered_items = []
         for i, item_parts in enumerate(self.items_content_parts, 1):
-            item_text = "".join(part.render(enable_color) for part in item_parts)
+            item_text = "".join(
+                part.render(enable_color, inline=True) if hasattr(part, "render") and "inline" in part.render.__code__.co_varnames
+                else part.render(enable_color) if hasattr(part, "render")
+                else str(part)
+                for part in item_parts
+            )
             rendered_items.append(f"{numbered_style}{i}.{RESET if enable_color else ''} {item_text}")
+        if inline:
+            return ", ".join(rendered_items)
         return "\n".join(rendered_items) + "\n"
 
 class TableElement:
@@ -171,21 +185,14 @@ class TableElement:
 
     def _wrap_cell(self, text, width):
         """Wrap text to fit in the given display width, preserving ANSI codes."""
-        # This regex matches an ANSI escape sequence.
         ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
 
         lines = []
         current_line_parts = []
         current_line_visible_width = 0
 
-        # Preserve the initial ANSI state if any, to apply to subsequent wrapped lines.
-        # This is a simplification; a full solution would track active styles.
         initial_ansi_codes = "".join(re.findall(ansi_escape, text))
-        
-        # Split the text into parts: (text_segment, ansi_code_before_it)
-        # This regex splits before an ANSI escape sequence, but keeps the escape sequence.
         parts = re.split(r'(\x1b\[[0-9;]*m)', text)
-        # Filter out empty strings from the split and pair them up.
         processed_parts = []
         current_text = ""
         for part in parts:
@@ -201,7 +208,6 @@ class TableElement:
         if current_text:
             processed_parts.append(('text', current_text))
 
-
         for part_type, part_content in processed_parts:
             if part_type == 'ansi':
                 current_line_parts.append(part_content)
@@ -209,16 +215,14 @@ class TableElement:
                 for char in part_content:
                     char_width = wcswidth(char)
                     if current_line_visible_width + char_width > width:
-                        # Current line is full, add it to lines
-                        lines.append("".join(current_line_parts) + RESET) # Ensure reset at end of line
-                        current_line_parts = [initial_ansi_codes] # Start new line, try to preserve initial style
+                        lines.append("".join(current_line_parts) + RESET)
+                        current_line_parts = [initial_ansi_codes]
                         current_line_visible_width = 0
-
                     current_line_parts.append(char)
                     current_line_visible_width += char_width
-        
+
         if current_line_parts:
-            lines.append("".join(current_line_parts) + RESET) # Ensure reset at end of the last line
+            lines.append("".join(current_line_parts) + RESET)
 
         return lines
 
@@ -226,7 +230,6 @@ class TableElement:
         if not self.headers and not self.rows:
             return ""
 
-        # Collect all cell contents
         all_cells = [self.headers] + self.rows
         num_cols = max(len(row) for row in all_cells)
         column_widths = [0] * num_cols
@@ -236,27 +239,28 @@ class TableElement:
         for row in all_cells:
             row_texts = []
             for i, cell_parts in enumerate(row):
-                # Pass enable_color to inline content rendering
-                text = "".join(part.render(enable_color) for part in cell_parts)
+                # Render lists inline if possible
+                text = "".join(
+                    part.render(enable_color, inline=True) if hasattr(part, "render") and "inline" in part.render.__code__.co_varnames
+                    else part.render(enable_color) if hasattr(part, "render")
+                    else str(part)
+                    for part in cell_parts
+                )
                 width = self._visible_width(text)
-                if i < num_cols and width > column_widths[i]: # Ensure index is within bounds
+                if i < num_cols and width > column_widths[i]:
                     column_widths[i] = width
                 row_texts.append(text)
             cell_texts.append(row_texts)
 
-        # Add padding
         column_widths = [w + 2 for w in column_widths]
-
         total_width = sum(column_widths) + len(column_widths) + 1
 
-        # Shrink table if too wide
         if total_width > self.max_width:
             available = self.max_width - (len(column_widths) + 1)
             min_col_width = 6
             flexible_cols = [max(min_col_width, int(w * available / sum(column_widths))) for w in column_widths]
             column_widths = flexible_cols
 
-        # Unicode borders
         def make_border(left, mid, right, fill):
             return left + mid.join(fill * w for w in column_widths) + right
 
@@ -281,28 +285,23 @@ class TableElement:
                         txt = lines[line_num]
                     else:
                         txt = ""
-
                     pad_len = column_widths[i] - self._visible_width(txt) - 1
-                    if is_header and enable_color: # Apply bold only if color is enabled
+                    if is_header and enable_color:
                         cell = f" {BOLD}{txt}{RESET}" + " " * pad_len
                     else:
                         cell = f" {txt}" + " " * pad_len
                     line_cells.append(cell)
                 output_lines.append("│" + "│".join(line_cells) + "│")
 
-        # Render header
         if self.headers:
             render_row(cell_texts[0], is_header=True)
             output_lines.append(middle_border)
 
-        # Render rows
         for row in cell_texts[1:]:
             render_row(row)
 
         output_lines.append(bottom_border)
         return "\n".join(output_lines) + "\n"
-
-
 
 class Button:
     def __init__(self, label):
@@ -385,7 +384,7 @@ class ImageElement:
             return f"\n{output.getvalue()}[Image: {self.alt if self.alt else self.src}]\n"
 
         except Exception as e:
-            return f"\n[Error rendering image {self.src}: {e}]\n"
+            return f"[Image]"
 class Nav:
     def __init__(self, elements):
         self.elements = elements

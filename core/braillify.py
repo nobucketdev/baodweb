@@ -1,5 +1,5 @@
 import shutil
-from core.font import font_8x6  # Your 8x6 font mapping
+from core.font import font_8x6, font_5x8  # Import both fonts
 
 braille_lookup = [
     [0x01, 0x08],
@@ -48,9 +48,17 @@ def render_braille_bitmap(bitmap, color_func=None):
         out_lines.append("".join(line))
     return "\n".join(out_lines)
 
-def braillify(text, color=None):
+# Added font_mode parameter
+def braillify(text, color=None, font_mode='6x8'): # Default to 6x8
     term_cols = shutil.get_terminal_size().columns
-    letter_w, letter_h, spacing = 6, 8, 1
+
+    if font_mode == '5x8':
+        selected_font = font_5x8
+        letter_w, letter_h, spacing = 5, 8, 1 # Adjusted letter_w for 5x8
+    else: # Default or '6x8'
+        selected_font = font_8x6
+        letter_w, letter_h, spacing = 6, 8, 1
+
     char_w = letter_w + spacing
     chars_per_line = max(1, (term_cols * 2) // char_w)
 
@@ -66,12 +74,12 @@ def braillify(text, color=None):
         bitmap = [[0] * width for _ in range(letter_h)]
 
         for i, ch in enumerate(line):
-            glyph = font_8x6.get(ch)
+            glyph = selected_font.get(ch) # Use selected_font
             if not glyph:
                 continue
             x_off = i * char_w
             for y in range(letter_h):
-                for x in range(letter_w):
+                for x in range(letter_w): # Use letter_w from selected font
                     bitmap[y][x_off + x] = glyph[y][x]
         bitmaps.append(bitmap)
 
@@ -94,7 +102,10 @@ if __name__ == "__main__":
             text = input("Enter text to braillify (or 'exit'): ")
             if text.lower() == 'exit':
                 break
-            print(braillify(text, color=True)  # 27 = bright blue in 256-color
-)  # Try default colored output
+            # Example of how to use both modes
+            print("Using 6x8 font:")
+            print(braillify(text, color=True, font_mode='6x8'))
+            print("\nUsing 5x8 font:")
+            print(braillify(text, color=True, font_mode='5x8')) # Added 5x8 example
     except KeyboardInterrupt:
         print("\nExiting.")

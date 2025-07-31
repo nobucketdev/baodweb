@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 # --- ANSI Escape Codes (for easier reference) ---
 RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
@@ -24,3 +26,13 @@ BLUE_BG = "\x1b[34m"
 MAGENTA_BG = "\x1b[45m"
 CYAN_BG = "\x1b[46m"
 WHITE_BG = "\x1b[47m"
+
+@lru_cache(maxsize=4096)
+def rgb_to_256_ansi(r, g, b):
+    # This function is highly optimized due to lru_cache.
+    # The logic itself is already efficient for its purpose.
+    if r == g == b:
+        if r < 8: return 16
+        if r > 248: return 231
+        return 232 + (r * 23) // 255
+    return 16 + 36 * ((r * 5) // 255) + 6 * ((g * 5) // 255) + ((b * 5) // 255)

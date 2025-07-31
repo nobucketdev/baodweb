@@ -4,9 +4,7 @@ import re
 import shutil
 import sys
 from datetime import datetime
-
 import requests
-from __version__ import __version__
 from core.configman import ConfigManager
 from core.parser import SUPPORTED_TAGS, Parser
 
@@ -15,8 +13,8 @@ if os.name == "nt":
 else:
     import termios
     import tty
-print("--------- BaodWeb Terminal Browser ---------")
-print(f"BaodWeb Terminal Browser version {__version__}")
+print("------ BaodWeb Terminal Browser -------")
+print(f"BaodWeb Terminal Browser version 1.2.0")
 
 
 def resource_path(relative_path):
@@ -683,7 +681,7 @@ def main():
         return
     arg = args[0].lower()
     if arg in ("--version", "-v"):
-        print(f"baodweb version {__version__}")
+        print(f"baodweb version 1.2.0-beta")
         return
     if arg in ("--help", "-h"):
         print("Usage: baodweb [options]")

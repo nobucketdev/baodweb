@@ -1,0 +1,27 @@
+[project]
+name = "BaoDWeb"
+version = "1.2.0"
+description = "A terminal-based web browser written in Python. It fetches and renders HTML with support for ANSI color, styled text, dynamic image rendering, and interactive features — all from the command line"
+authors = [{ name = "baod (nobucketdev)" }]
+dependencies = [
+    "beautifulsoup4==4.13.4",
+    "lxml==6.0.0",
+    "numpy==2.3.2",
+    "Pillow==11.3.0",
+    "requests==2.32.4",
+    "wcwidth==0.2.13"
+]
+requires-python = ">=3.9"
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["core"]
+
+[tool.setuptools.package-data]
+core = ["../test-pages/*", "../error/*"]
+
+[project.scripts]
+baodweb = "core.main:main" 

@@ -1,24 +1,13 @@
 from PIL import Image
-from functools import lru_cache
 import numpy as np
 import sys
+from core.ansi import *
 
-RESET = "\x1b[0m"
 
 # These caches are only used when enable_true_color is False.
 # For true-color, numpy vectorization is used, which is faster.
 _ansi_fg_cache = {}
 _ansi_bg_cache = {}
-
-@lru_cache(maxsize=4096)
-def rgb_to_256_ansi(r, g, b):
-    # This function is highly optimized due to lru_cache.
-    # The logic itself is already efficient for its purpose.
-    if r == g == b:
-        if r < 8: return 16
-        if r > 248: return 231
-        return 232 + (r * 23) // 255
-    return 16 + 36 * ((r * 5) // 255) + 6 * ((g * 5) // 255) + ((b * 5) // 255)
 
 def get_cached_fg(r, g, b):
     # This is called when true_color is False.
