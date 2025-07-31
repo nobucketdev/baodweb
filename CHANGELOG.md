@@ -3,7 +3,24 @@
 All notable changes to **BaodWeb** will be documented in this file.
 
 ---
-## 1.2.0 — Layout & Render Overhaul  
+## 1.2.0 — Alpha Polish  
+**Release Date:** July 31, 2025
+
+### 🧼 Visual & Code Polish  
+Refined the layout, cleaned up code.
+
+### ⚠️ Known Issues
+
+- **List-Table Layout Conflict:**  
+  Lists (`<ul>`, `<ol>`) inside tables still break alignment. No fix yet — avoid if you value structure.
+
+- **Alt Text Duplication:**  
+  Long `alt` texts may still repeat when scrolling.
+
+---
+
+
+## 1.2.0-alpha — Layout & Render Overhaul  
 **Release Date:** July 30, 2025
 
 ## ✦ What's New
