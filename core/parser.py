@@ -6,6 +6,7 @@ import lxml
 
 SUPPORTED_TAGS = {
     'html', 'body', 'section', 'article', 'main', 'div',
+    'header', 'footer',  # <-- new structural tags
     'h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'a', 'button', 'img', 'nav',
     'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'span',
     'widget'
@@ -140,6 +141,19 @@ class Parser:
                         for child in tag.contents
                         for element in self.parse_element(child, current_anchors, next_anchor_id)]
             return [Nav(elements)]
+        
+        if tag_name == 'header':
+            elements = [element
+                        for child in tag.contents
+                        for element in self.parse_element(child, current_anchors, next_anchor_id)]
+            return [Header(elements)]
+
+        if tag_name == 'footer':
+            elements = [element
+                        for child in tag.contents
+                        for element in self.parse_element(child, current_anchors, next_anchor_id)]
+            return [Footer(elements)]
+
 
         if tag_name == 'widget':
             widget_type = tag.get('type')

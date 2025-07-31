@@ -6,6 +6,12 @@
     <title> Welcome to BaoDWeb </title>
 </head>
 <body>
+
+    <header>
+        <h1>Welcome to BaoDWeb</h1>
+        <p>A terminal-based web browser built for speed and style.</p>
+    </header>
+
     <nav>
         <a href="home">Home</a>
         <a href="dashboard">Dashboard</a>
@@ -14,81 +20,85 @@
         <a href="https://www.google.com/search?q=terminal+browser">Secret</a>
     </nav>
 
-    <h1>Welcome to Your Fancy Terminal Browser!</h1>
-    <p>
-        Navigate the web with style, right from your terminal. This browser is designed for efficiency and a unique visual experience.
-    </p>
+    <main>
+        <h1>Welcome to Your Fancy Terminal Browser!</h1>
+        <p>
+            Navigate the web with style, right from your terminal. This browser is designed for efficiency and a unique visual experience.
+        </p>
 
-    <h2>✨ Key Features:</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Feature</th>
-                <th>Description</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>Fast Rendering</td>
-                <td>Experience quick, text-based display of web content.</td>
-            </tr>
-            <tr>
-                <td>Basic HTML Support</td>
-                <td>Renders headings, paragraphs, lists, links, and more.</td>
-            </tr>
-            <tr>
-                <td>Image Rendering</td>
-                <td>View images converted into engaging ASCII/terminal art.</td>
-            </tr>
-            <tr>
-                <td>Local File Browsing</td>
-                <td>Access and display local HTML files from the 'test-pages' directory.</td>
-            </tr>
-            <tr>
-                <td>Dynamic Widgets</td>
-                <td>Display live time, weather, and news directly on your dashboard.</td>
-            </tr>
-        </tbody>
-    </table>
+        <h2>✨ Key Features:</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Fast Rendering</td>
+                    <td>Experience quick, text-based display of web content.</td>
+                </tr>
+                <tr>
+                    <td>Basic HTML Support</td>
+                    <td>Renders headings, paragraphs, lists, links, and more.</td>
+                </tr>
+                <tr>
+                    <td>Image Rendering</td>
+                    <td>View images converted into engaging ASCII/terminal art.</td>
+                </tr>
+                <tr>
+                    <td>Local File Browsing</td>
+                    <td>Access and display local HTML files from the 'test-pages' directory.</td>
+                </tr>
+                <tr>
+                    <td>Dynamic Widgets</td>
+                    <td>Display live time, weather, and news directly on your dashboard.</td>
+                </tr>
+            </tbody>
+        </table>
 
-    <h2>💡 How to Use:</h2>
-    <p>
-        Type commands in the prompt below and press Enter:
-    </p>
-    <ul>
-        <li><code>go &lt;url&gt;</code>: Navigate to a website (e.g., <code>go example.com</code> or <code>go https://news.ycombinator.com</code>)</li>
-        <li><code>dashboard</code>: Go to your personalized dashboard with live widgets.</li>
-        <li><code>test &lt;page-name&gt;</code>: Load a local HTML file from the 'test-pages' folder (e.g., <code>test features</code> to load <code>features.html</code>. The <code>.html</code> extension is optional!)</li>
-        <li><code>list-tests</code>: Display a list of all available local test pages in the 'test-pages' directory.</li>
-        <li><code>list-languages</code>: List available language</li>
-        <li><code>config</code>: A tool help you see you configuration</li>
-        <li><code>config &lt;option&gt; &lt;value&gt;</code>: Config option, e.g., config language en - change current language to English</li>
-        <li><code>click &lt;id show in bracket [] befor a anchor&gt;</code>: Emulating clicking a link and take you to the linked url</li>
-        <li><code>back</code>: Go back to the previous page in your browsing history.</li>
-        <li><code>quit</code>: Exit the browser application.</li>
-        <li><code>generate &lt;tag name&gt;</code>: Generate a random test page using the given tag.</li>
-    </ul>
+        <h2>💡 How to Use:</h2>
+        <p>Type commands in the prompt below and press Enter:</p>
+        <ul>
+            <li><code>go &lt;url&gt;</code>: Navigate to a website (e.g., <code>go example.com</code>)</li>
+            <li><code>dashboard</code>: Go to your personalized dashboard</li>
+            <li><code>test &lt;page-name&gt;</code>: Load a local HTML file from the 'test-pages' folder</li>
+            <li><code>list-tests</code>: Display a list of all available local test pages</li>
+            <li><code>list-languages</code>: List available language</li>
+            <li><code>config</code>: View your configuration</li>
+            <li><code>config &lt;option&gt; &lt;value&gt;</code>: Update a config</li>
+            <li><code>click [&lt;id&gt;]</code>: Simulate clicking a link</li>
+            <li><code>back</code>: Go back in browsing history</li>
+            <li><code>quit</code>: Exit the browser</li>
+            <li><code>generate &lt;tag name&gt;</code>: Generate a random test page</li>
+        </ul>
 
-    <h2>📊 Your Live Dashboard Widgets:</h2>
-    <p>Here are some live widgets to get you started:</p>
-    <widget type="time"></widget>
-    <widget type="weather"></widget>
-    <p>Fake news never believe: </p>
-    <widget type="news"></widget>
+        <h2>📊 Your Live Dashboard Widgets:</h2>
+        <p>Here are some live widgets to get you started:</p>
+        <widget type="time"></widget>
+        <widget type="weather"></widget>
+        <p>Fake news never believe: </p>
+        <widget type="news"></widget>
 
-    <h2>🖼️ A Glimpse of Terminal Art:</h2>
-    <p>Here's a small demonstration of dog image rendering:</p>
-    <img src="https://picsum.photos/id/237/200/100" alt="Random Dog Image" width="200" height="100">
+        <h2>🖼️ A Glimpse of Terminal Art:</h2>
+        <p>Here's a small demonstration of dog image rendering:</p>
+        <img src="https://picsum.photos/id/237/200/100" alt="Random Dog Image" width="200" height="100">
 
-    <p>
-        Enjoy your browsing experience! Don't forget to check out the <a href="help.html">help page</a> for more details.
-    </p>
+        <p>
+            Enjoy your browsing experience! Don't forget to check out the <a href="help.html">help page</a> for more details.
+        </p>
 
-    <p>
-        <small>Developed with Python & BeautifulSoup for a unique terminal experience.</small>
-    </p>
-    <p>By Bao</p>
+        <p><small>Developed with Python & BeautifulSoup for a unique terminal experience.</small></p>
+        <p>By Bao</p>
 
-    <p>Try typing "go google.com" or "list-tests" or "dashboard"</p>
+        <p>Try typing "go google.com" or "list-tests" or "dashboard"</p>
+    </main>
+
+    <footer>
+        <p>© 2025 BaoDWeb Terminal Browser</p>
+        <p>Made with ❤️  in the CLI</p>
+    </footer>
+
 </body>
 </html>

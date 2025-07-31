@@ -488,4 +488,80 @@ class WidgetElement:
         rendered_widget.append(bottom_border)
         
         return "\n".join(rendered_widget) + "\n"
+class Header:
+    def __init__(self, elements):
+        self.elements = elements
+        self.tag_type = 'header'
 
+    def render(self, enable_color=True):
+        rendered_children = []
+        for element in self.elements:
+            rendered = element.render(enable_color)
+            if not rendered.endswith('\n'):
+                rendered += '\n'
+            rendered_children.append(rendered)
+
+        content = "".join(rendered_children).strip()
+        if not content:
+            return ""
+
+        border_color = CYAN_FG if enable_color else ""
+        reset = RESET if enable_color else ""
+
+        lines = content.split('\n')
+        term_width = shutil.get_terminal_size((100, 20)).columns
+        padded_lines = []
+
+        for line in lines:
+            line_stripped = re.sub(r'\x1b\[[0-9;]*m', '', line)
+            line_width = wcswidth(line_stripped)
+            total_padding = term_width - 4 - line_width
+            left_pad = total_padding // 2
+            right_pad = total_padding - left_pad
+            padded_lines.append(
+                f"{border_color}│ {reset}{' ' * left_pad}{line}{' ' * right_pad}{border_color} │{reset}"
+            )
+
+        top = f"{border_color}╭{'─' * (term_width - 2)}╮{reset}"
+        bottom = f"{border_color}╰{'─' * (term_width - 2)}╯{reset}"
+
+        return "\n".join([top] + padded_lines + [bottom]) + "\n"
+
+class Footer:
+    def __init__(self, elements):
+        self.elements = elements
+        self.tag_type = 'footer'
+
+    def render(self, enable_color=True):
+        rendered_children = []
+        for element in self.elements:
+            rendered = element.render(enable_color)
+            if not rendered.endswith('\n'):
+                rendered += '\n'
+            rendered_children.append(rendered)
+
+        content = "".join(rendered_children).strip()
+        if not content:
+            return ""
+
+        border_color = MAGENTA_FG if enable_color else ""
+        reset = RESET if enable_color else ""
+
+        lines = content.split('\n')
+        term_width = shutil.get_terminal_size((100, 20)).columns
+        padded_lines = []
+
+        for line in lines:
+            line_stripped = re.sub(r'\x1b\[[0-9;]*m', '', line)
+            line_width = wcswidth(line_stripped)
+            total_padding = term_width - 4 - line_width
+            left_pad = total_padding // 2
+            right_pad = total_padding - left_pad
+            padded_lines.append(
+                f"{border_color}│ {reset}{' ' * left_pad}{line}{' ' * right_pad}{border_color} │{reset}"
+            )
+
+        top = f"{border_color}╭{'─' * (term_width - 2)}╮{reset}"
+        bottom = f"{border_color}╰{'─' * (term_width - 2)}╯{reset}"
+
+        return "\n".join([top] + padded_lines + [bottom]) + "\n"
