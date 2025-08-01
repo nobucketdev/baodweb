@@ -1,9 +1,11 @@
+# -------------- USED LATER --------------#
+
 import requests
 from bs4 import BeautifulSoup
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "AppleWebKit/537.36    (KHTML, like Gecko) "
                   "Chrome/102.0.0.0 Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9"
 }
@@ -58,3 +60,4 @@ def hybrid_search(query):
         results = search_duckduckgo(query)
         engine = "DuckDuckGo" if results else "None"
     return results or [], engine
+

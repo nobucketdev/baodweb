@@ -638,7 +638,7 @@ class Browser:
                 )
         elif user_input == "help":
             print(
-                "Commands: go <url>, search <query>, s <query>, dashboard, test <test-page-name>, back, list-tests, list-languages, config [option] [value], click <id>, up, down, quit, help"
+                "Commands: go <url>, search <query>, s <query>, dashboard, test <test-page-name>, back, list-tests, config [option] [value], click <id>, up, down, quit, help"
             )
         else:
             print("Unknown command. Type 'help' for a list of commands.")
