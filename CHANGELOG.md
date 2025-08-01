@@ -3,6 +3,21 @@
 All notable changes to **BaodWeb** will be documented in this file.
 
 ---
+
+## 1.2.1 — Two Structural Semantic Tags Supported 
+**Release Date:** August 1, 2025
+
+### ✨ Feature Additions
+- **Header & Footer Support:**  
+  Added native handling for `<header>` and `<footer>` tags.
+
+- **Early Access: Search Engine Integration:**  
+  Introduced basic search support using a hybrid engine setup.
+
+### ⚠️ Known Issues
+- Old bugs still not fixed.
+
+---
 ## 1.2.0 — Alpha Polish  
 **Release Date:** July 31, 2025
 
