@@ -4,7 +4,7 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 ---
 
-## 1.2.4 — Semantic Navigation Fix & Smart Layout
+## 1.2.4 — Navigation Enhancement & Resolve URL
 **Release Date:** August 2, 2025
 
 ### ✅ Improvements & fixes
