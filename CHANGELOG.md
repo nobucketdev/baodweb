@@ -16,8 +16,8 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 
 ### ✅ Improvements.
-- Navigation rendering accepts inline-style tags only (e.g., `<a>`, `<button>`, `<p>`, `<span>`, etc.)
-- Safer, cleaner, semantic nav rendering with fallback for complex structures.
+- Navigation rendering accepts non-container tags only (e.g., `<a>`, `<button>`, `<p>`, `<span>`, etc.)
+- Safer, cleaner, semantic nav rendering with compatability complex structures.
 
 ---
 

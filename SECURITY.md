@@ -6,7 +6,7 @@ BaodWeb is currently in early development. Only the latest release is actively m
 
 | Version       | Supported        |
 |---------------|------------------|
-| 1.2.0 - 1.2.3 | Yes              |
+| 1.2.0 - 1.2.5 | Yes              |
 | 1.1.0 - 1.1.2 | Yes              |
 | 1.0.0         | Yes              |
 | < 1.0.0       | No               |
