@@ -4,6 +4,32 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 ---
 
+## 1.2.5 — Semantic Navigation Fix & Smart Layout
+**Release Date:** August 2, 2025
+
+### 🛠 Fixes
+- **Nested Link Parsing in `<nav>`:**  
+  Resolved an issue where non-container tags inside `<div>` or `<section>` inside a `<nav>` were ignored. Navigation bar now recursively picks up valid inline elements only.
+
+- **Navigation Layout Overflow:**  
+  Navigation bar now **dynamically adjusts width** based on actual content, preventing ugly terminal overflow or full-width stretching.
+
+
+### ✅ Improvements.
+- Navigation rendering accepts inline-style tags only (e.g., `<a>`, `<button>`, `<p>`, `<span>`, etc.)
+- Safer, cleaner, semantic nav rendering with fallback for complex structures.
+
+---
+
+## 1.2.4 — URL Resolution Fixes
+**Release Date:** August 2, 2025
+
+### 🐛 Bug Fixes
+- **Fixed: Relative vs Global URL Confusion**  
+  Corrected the logic that was misinterpreting relative URLs as global ones (vice versa), improving navigation and resource handling.
+
+---
+
 ## 1.2.3 — Source Polish & Layout Fixes  
 **Release Date:** August 2, 2025
 

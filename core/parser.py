@@ -34,7 +34,7 @@ class Parser:
         return ''.join(mapping.get(char, char) for char in text)
 
     def parse(self, html, current_anchors=None, next_anchor_id=None):
-        soup = BeautifulSoup(html, 'lxml')
+        soup = BeautifulSoup(html, 'html.parser') # Use 'html.parser' for better compatibility
         elements = []
         page_title = "No Title"
 
@@ -197,10 +197,29 @@ class Parser:
             return [div]
 
         if tag_name == 'nav':
-            elements = [element
-                        for child in tag.contents
-                        for element in self.parse_element(child, current_anchors, next_anchor_id)]
-            return [Nav(elements)]
+            allowed_nav_tags = {'a', 'p', 'span', 'button', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'h1', 'h2', 'h3', 'text'}
+
+            def extract_nav_content(tag):
+                output = []
+                for child in tag.contents:
+                    if isinstance(child, (Comment, Doctype)):
+                        continue
+                    if isinstance(child, str):
+                        stripped = child.strip()
+                        if stripped:
+                            output.append(TextNode(stripped))
+                        continue
+                    if not hasattr(child, 'name'):
+                        continue
+                    name = child.name.lower()
+                    if name in allowed_nav_tags:
+                        output.extend(self.parse_element(child, current_anchors, next_anchor_id))
+                    elif name in {'div', 'section', 'article'}:
+                        output.extend(extract_nav_content(child))  # recursive dive
+                return output
+
+            return [Nav(extract_nav_content(tag))]
+
 
         if tag_name == 'header':
             elements = [element

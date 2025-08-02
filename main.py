@@ -10,8 +10,8 @@ from core.parser import SUPPORTED_TAGS, Parser
 from core.search import hybrid_search # Assuming search_engine.py is in the same directory
 import html
 
-# No longer importing urllib.parse
-# from urllib.parse import urljoin, urlparse
+# Import urllib.parse for robust URL handling
+from urllib.parse import urljoin, urlparse
 
 if os.name == "nt":
     import msvcrt
@@ -19,9 +19,9 @@ else:
     import termios
     import tty
 print("────── BaodWeb Terminal Browser ───────")
-print(f"BaodWeb Terminal Browser version 1.2.3")
+print(f"BaodWeb Terminal Browser version 1.2.4")
 print("Test ANSI:")
-print("\033[90m!! \033[0m\033[34mHello\\033[0m\033[90m World\033[0m")
+print("\033[1;32mThis is a test of ANSI colors.\033[0m")
 
 
 def resource_path(relative_path):
@@ -31,97 +31,92 @@ def resource_path(relative_path):
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, relative_path)
 
-
 def highlight_html(html_str: str) -> str:
     """
     Highlights HTML source code with ANSI colors for better readability.
-    This function has been refactored for improved accuracy.
+    This version uses a more robust regex pattern and finditer to prevent
+    the entire document from being incorrectly colored as a comment.
     """
-    # ANSI colors
-    COLOR_TAG = "\x1b[34m"      # Blue for tags
-    COLOR_ATTR_NAME = "\033[38;2;206;131;77m"  # Caramel-orange for attribute names
-    COLOR_ATTR_VALUE = "\033[38;2;152;195;121m" # Green for attribute values
-    COLOR_BRACKET = "\033[90m"  # Gray for brackets (<, >, /)
-    COLOR_DOCTYPE = "\033[36m"  # Cyan for doctype
-    COLOR_COMMENT = "\033[32m"  # Green for comments
-    COLOR_RESET = "\033[0m"     # Default reset
-    
-    # A more robust pattern to split the HTML into tags and text content
-    # It captures comments, doctypes, tags, and everything else in between.
-    split_pattern = re.compile(
-        r'(?s)(<!--.*?-->)|(<!DOCTYPE.*?>)|(<\/?[\w\d]+(?:\s+[^>]*?)?>)'
+    # ANSI colors for terminal output
+    COLOR_TAG = "\x1b[34m"        # Blue for tags
+    COLOR_ATTR_NAME = "\033[38;2;206;131;77m"  # Orange for attribute names
+    COLOR_ATTR_VALUE = "\033[38;2;152;195;121m"  # Green for attribute values
+    COLOR_BRACKET = "\033[90m"    # Gray for brackets (<, >, /)
+    COLOR_DOCTYPE = "\033[36m"    # Cyan for doctype
+    COLOR_COMMENT = "\033[32m"    # Green for comments
+    COLOR_RESET = "\033[0m"       # Default reset
+
+    # A comprehensive regex pattern to match all key HTML parts
+    # Group 1: Comments, Group 2: Doctype, Group 3: Tags, Group 4: Text
+    token_pattern = re.compile(
+        r'(<!--.*?-->)|(<!DOCTYPE.*?>)|(<\/?[\w\d:-]+(?:\s+[^>]*?)?>)|([^<]+)', re.DOTALL
     )
 
-    parts = split_pattern.split(html_str)
     highlighted_parts = []
-
-    # Regex for parsing attributes within a tag
+    
+    # Regex to parse attributes within a tag
     attr_pattern = re.compile(r'(\s+)([\w-]+)\s*(=\s*(["\'])(.*?)\4)?')
 
-    for part in parts:
-        if not part:
-            continue
-            
-        if part.startswith('<!--') and part.endswith('-->'):
-            # It's a comment
-            highlighted_parts.append(COLOR_COMMENT + part + COLOR_RESET)
-        elif part.startswith('<!DOCTYPE'):
-            # It's a doctype declaration
-            highlighted_parts.append(COLOR_DOCTYPE + part + COLOR_RESET)
-        elif part.startswith('<') and part.endswith('>'):
-            # It's a tag
+    for match in token_pattern.finditer(html_str):
+        # Comments
+        if match.group(1):
+            highlighted_parts.append(COLOR_COMMENT + match.group(1) + COLOR_RESET)
+        # Doctype
+        elif match.group(2):
+            highlighted_parts.append(COLOR_DOCTYPE + match.group(2) + COLOR_RESET)
+        # Tags
+        elif match.group(3):
+            part = match.group(3)
             tag_content = part[1:-1] # Remove the outer < and >
             
-            # Find the tag name
-            match = re.match(r'^\s*\/?\s*([\w\d-]+)', tag_content)
-            tag_name_str = match.group(0) if match else ''
-
             highlighted_tag = ''
             
             # Color the leading bracket
             highlighted_tag += COLOR_BRACKET + '<' + COLOR_RESET
 
-            # Color the tag name and any leading slash
-            if tag_name_str.startswith('/'):
-                highlighted_tag += COLOR_BRACKET + '/' + COLOR_RESET
-                highlighted_tag += COLOR_TAG + tag_name_str[1:] + COLOR_RESET
+            # Find the tag name
+            tag_name_match = re.match(r'^\s*[\/]?\s*([\w\d:-]+)', tag_content)
+            if tag_name_match:
+                tag_name_str = tag_name_match.group(0)
+                # Color the leading slash if it exists
+                if tag_name_str.startswith('/'):
+                    highlighted_tag += COLOR_BRACKET + '/' + COLOR_RESET
+                    highlighted_tag += COLOR_TAG + tag_name_str[1:] + COLOR_RESET
+                else:
+                    highlighted_tag += COLOR_TAG + tag_name_str + COLOR_RESET
+                
+                # Process attributes
+                attr_string = tag_content[len(tag_name_str):]
+                last_pos = 0
+                for attr_match in attr_pattern.finditer(attr_string):
+                    highlighted_tag += attr_string[last_pos:attr_match.start()]
+                    highlighted_tag += attr_match.group(1) # Space
+                    highlighted_tag += COLOR_ATTR_NAME + attr_match.group(2) + COLOR_RESET # Attr name
+                    
+                    if attr_match.group(3):
+                        highlighted_tag += COLOR_BRACKET + '=' + COLOR_RESET
+                        highlighted_tag += COLOR_ATTR_VALUE + attr_match.group(3).strip('= ') + COLOR_RESET
+                    
+                    last_pos = attr_match.end()
+                
+                highlighted_tag += attr_string[last_pos:]
             else:
-                highlighted_tag += COLOR_TAG + tag_name_str + COLOR_RESET
-            
-            # Process attributes
-            attr_string = tag_content[len(tag_name_str):]
-            last_pos = 0
-            for attr_match in attr_pattern.finditer(attr_string):
-                # Add any non-matching text (like spaces before the first attribute)
-                highlighted_tag += attr_string[last_pos:attr_match.start()]
-                
-                # Add the space
-                highlighted_tag += attr_match.group(1)
-                
-                # Add the attribute name
-                highlighted_tag += COLOR_ATTR_NAME + attr_match.group(2) + COLOR_RESET
-                
-                # Add the equals sign and value, if they exist
-                if attr_match.group(3):
-                    highlighted_tag += COLOR_BRACKET + '=' + COLOR_RESET
-                    highlighted_tag += COLOR_ATTR_VALUE + attr_match.group(3).strip('= ') + COLOR_RESET
-                
-                last_pos = attr_match.end()
-            
-            # Add any remaining content inside the tag
-            highlighted_tag += attr_string[last_pos:]
-            
+                # Fallback for malformed tags
+                highlighted_tag += tag_content
+
             # Color the trailing bracket
             highlighted_tag += COLOR_BRACKET + '>' + COLOR_RESET
             
             highlighted_parts.append(highlighted_tag)
 
+        # Plain Text
         else:
-            # It's regular text, just append it
-            highlighted_parts.append(html.unescape(part))
+            highlighted_parts.append(html.unescape(match.group(4)))
 
-    # Add 4 spaces of indentation for each line of the source view
+    # Add 4 spaces of indentation for each line
     return "\n".join(["    " + line for line in "".join(highlighted_parts).splitlines()])
+
+
 
 # --- Renderer with Paging/Scrolling ---
 class Renderer:
@@ -190,7 +185,6 @@ class Renderer:
         enable_color = self.config_manager.is_color_enabled()
         CYAN_BOLD = "\033[1;36m" if enable_color else ""
         RESET = "\033[0m" if enable_color else ""
-        # MODIFICATION START
         # Set the terminal window title
         terminal_title = f"baodweb - {self.current_title}"
         sys.stdout.write(f"\x1b]0;{terminal_title}\a")
@@ -371,54 +365,42 @@ class Browser:
         self.scroll_offset = 0
 
     def _resolve_url(self, base_url, relative_url):
-        """Manually resolves a relative URL against a base URL."""
-        if relative_url.startswith(("http://", "https://", "file://")):
-            # It's already an absolute URL
-            return relative_url
-        
-        # This is a very basic way to parse and join URLs.
-        # It handles root-relative and path-relative links.
-        
-        # Find the protocol part
-        protocol_end = base_url.find("://")
-        if protocol_end == -1:
-            # No protocol, cannot resolve
-            return relative_url
-        protocol = base_url[:protocol_end + 3]
-        
-        # Find the domain part
-        domain_start = protocol_end + 3
-        path_start = base_url.find("/", domain_start)
-        
-        domain = ""
-        path = ""
-        if path_start == -1:
-            # The base URL is just a domain, e.g., "https://example.com"
-            domain = base_url[domain_start:]
-        else:
-            # The base URL has a path, e.g., "https://example.com/blog/"
-            domain = base_url[domain_start:path_start]
-            path = base_url[path_start:]
-            
-        if relative_url.startswith("/"):
-            # Root-relative link, e.g., "/about"
-            return f"{protocol}{domain}{relative_url}"
-        else:
-            # Path-relative link, e.g., "contact.html" or "../home.html"
-            last_slash = path.rfind("/")
-            if last_slash != -1:
-                base_path = path[:last_slash + 1]
-                # Note: This simple implementation doesn't handle '..' like urljoin does.
-                return f"{protocol}{domain}{base_path}{relative_url}"
-            else:
-                # No path, just a domain and a file
-                return f"{protocol}{domain}/{relative_url}"
+        """Resolves a relative URL against a base URL using urllib.parse.urljoin."""
+        return urljoin(base_url, relative_url)
 
-    def navigate(self, url):
-        # MODIFIED: Use our custom _resolve_url function
-        if self._base_url:
+    def navigate(self, url, is_go_command=False):
+        original_url = url # Keep original for error messages if needed
+
+        if is_go_command:
+            # For 'go' command, we are strict:
+            # 1. If it's already absolute (http/s, file, test:, config-page:), proceed.
+            # 2. If it's a bare domain (e.g., "example.com"), prepend "https://".
+            # 3. Otherwise (looks like a relative path, e.g., "/foo", "bar/baz.html"), consider it an error.
+            if not url.startswith(("http://", "https://", "file://", "test:", "config-page:")):
+                # Check for bare domain pattern (contains a dot, no slashes, no colons)
+                if '.' in url and '/' not in url and ':' not in url:
+                    url = "https://" + url
+                else: # Looks like a relative path or invalid bare domain for 'go'
+                    print(f"Error: 'go' command requires a full URL (e.g., 'https://example.com') or a bare domain (e.g., 'example.com'). Relative paths (like '{original_url}') are not supported by 'go'.", file=sys.stderr)
+                    return # Stop navigation
+        
+        # Now, handle the URL (either corrected from 'go' or passed from 'click'/'internal')
+        is_absolute_or_internal = url.startswith(("http://", "https://", "file://", "test:", "config-page:"))
+
+        # If it's a relative URL and we have a base URL, resolve it
+        if not is_absolute_or_internal and self._base_url:
+            print(f"Resolving relative URL '{url}' against base URL '{self._base_url}'")
             url = self._resolve_url(self._base_url, url)
-            
+        # If it's an absolute URL or internal command, update _base_url accordingly
+        elif is_absolute_or_internal:
+            # If it's an external absolute URL, set its base as the new _base_url
+            if url.startswith(("http://", "https://")):
+                parsed_url = urlparse(url)
+                # Ensure the base URL always ends with a slash if it's a domain base
+                self._base_url = f"{parsed_url.scheme}://{parsed_url.netloc}/"
+            else: # For internal commands like test:, config-page:, file://
+                self._base_url = None # Explicitly set to None for internal pages
+        
         self.current_url = url
         self.history.append(url)
         self.load_content(url)
@@ -430,24 +412,22 @@ class Browser:
         self._next_anchor_id = [1]
         try:
             if url == "home" or url == "dashboard":
-                # MODIFIED: Local pages don't have a base URL.
-                self._base_url = None
                 lang_home_path = resource_path(f"start-page-{current_lang}.html")
                 if os.path.exists(lang_home_path):
                     with open(lang_home_path, "r", encoding="utf-8") as f:
                         html_content = f.read()
+                    self._base_url = None # Local pages don't have an external base URL
                 else:
                     default_home_path = resource_path("start-page.html")
                     if os.path.exists(default_home_path):
                         with open(default_home_path, "r", encoding="utf-8") as f:
                             html_content = f.read()
+                        self._base_url = None # Local pages don't have an external base URL
                     else:
                         raise FileNotFoundError(
                             f"Neither {lang_home_path} nor {default_home_path} found."
                         )
             elif url.startswith("test:"):
-                # MODIFIED: Local pages don't have a base URL.
-                self._base_url = None
                 test_page_base_name = url[len("test:") :].strip()
                 lang_test_page_filename = f"{test_page_base_name}-{current_lang}.html"
                 lang_test_page_path = resource_path(
@@ -456,6 +436,7 @@ class Browser:
                 if os.path.exists(lang_test_page_path):
                     with open(lang_test_page_path, "r", encoding="utf-8") as f:
                         html_content = f.read()
+                    self._base_url = None # Local pages don't have an external base URL
                 else:
                     default_test_page_filename = f"{test_page_base_name}.html"
                     default_test_page_path = resource_path(
@@ -464,20 +445,25 @@ class Browser:
                     if os.path.exists(default_test_page_path):
                         with open(default_test_page_path, "r", encoding="utf-8") as f:
                             html_content = f.read()
+                        self._base_url = None # Local pages don't have an external base URL
                     else:
                         raise FileNotFoundError(
                             f"Neither {lang_test_page_path} nor {default_test_page_path} found."
                         )
             elif is_internal_html:
-                # MODIFIED: Internal HTML content doesn't have a base URL.
+                # Internal HTML content doesn't have a base URL.
                 self._base_url = None
                 html_content = url
             else:
-                if not url.startswith("http://") and not url.startswith("https://"):
+                # For external URLs, parse and set _base_url correctly
+                parsed_url = urlparse(url)
+                if not parsed_url.scheme: # If no scheme, default to https
                     url = "https://" + url
+                    parsed_url = urlparse(url) # Re-parse with scheme
                 
-                # MODIFIED: Store the URL as the base URL for the page being loaded.
-                self._base_url = url
+                # The base URL should be scheme://netloc/ (e.g., https://example.com/)
+                # This ensures consistent base URL for urljoin.
+                self._base_url = f"{parsed_url.scheme}://{parsed_url.netloc}/"
                 
                 print(f"Fetching {url}...")
                 response = requests.get(url, timeout=10)
@@ -523,7 +509,7 @@ class Browser:
         self.current_title = page_title
         self.renderer.render_to_buffer(elements, self.current_title)
         self.scroll_offset = 0
-        self.renderer.clear()  # Perform a full clear and redraw when content changes
+        self.renderer.clear() # Perform a full clear and redraw when content changes
         self.renderer.render_page(self.scroll_offset)
 
     def scroll_up(self):
@@ -531,19 +517,19 @@ class Browser:
         self.scroll_offset = max(0, self.scroll_offset - 1)
         if (
             old_scroll_offset != self.scroll_offset
-        ):  # Only re-render if scroll position changed
+        ): # Only re-render if scroll position changed
             self.renderer.render_page(self.scroll_offset)
 
     def scroll_down(self):
         old_scroll_offset = self.scroll_offset
         _, usable_height, total_lines = self.renderer.render_page(
             self.scroll_offset
-        )  # Get current state for boundary check
+        ) # Get current state for boundary check
         if self.scroll_offset + usable_height < total_lines:
             self.scroll_offset += 1
             if (
                 old_scroll_offset != self.scroll_offset
-            ):  # Only re-render if scroll position changed
+            ): # Only re-render if scroll position changed
                 self.renderer.render_page(self.scroll_offset)
 
     def go_back(self):
@@ -730,7 +716,7 @@ class Browser:
         if add_to_history:
             self.current_url = f"search-results:{query}"
             self.history.append(self.current_url)
-        # MODIFIED: For internal content like this, the base URL should be set to None.
+        # For internal content like this, the base URL should be set to None.
         self._base_url = None
         self.load_content(html_content, is_internal_html=True)
 
@@ -741,7 +727,7 @@ class Browser:
             self.scroll_down()
         elif user_input.startswith("go "):
             url = user_input[3:].strip()
-            self.navigate(url)
+            self.navigate(url, is_go_command=True) # Pass is_go_command=True
         elif user_input.startswith("search "):
             query = user_input[len("search "):].strip()
             self.handle_search_results(query)
@@ -761,9 +747,9 @@ class Browser:
                     print(
                         f"Clicking link [{anchor_id}]: {anchor.text} -> {anchor.href}"
                     )
-                    # MODIFIED: The link from the anchor might be relative, so we use navigate()
-                    # which now handles the resolution.
-                    self.navigate(anchor.href)
+                    # The link from the anchor might be relative, so we use navigate()
+                    # with is_go_command=False (default) which handles relative resolution.
+                    self.navigate(anchor.href) 
                 else:
                     print(
                         f"Error: No link found with ID {anchor_id}. Please check the displayed link IDs."
@@ -800,7 +786,7 @@ class Browser:
                 print(
                     "  config <option> <value> - Set a configuration option (e.g., config enable-color 0)"
                 )
-        # MODIFICATION: This is the new logic for the 'source' command.
+        # This is the new logic for the 'source' command.
         elif user_input == "source":
             if not self.last_html:
                 print("Error: No HTML content to display. Please browse to a page first.")
