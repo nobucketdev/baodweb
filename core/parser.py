@@ -1,17 +1,15 @@
 import sys
 from bs4 import BeautifulSoup, Comment, Doctype
 import re
-from core.elements import * # Assuming core.elements contains all your Element classes
-import lxml
+from core.elements import *
 
 SUPPORTED_TAGS = {
     'html', 'body', 'section', 'article', 'main', 'div',
-    'header', 'footer',  # <-- new structural tags
+    'header', 'footer',
     'h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'a', 'button', 'img', 'nav',
     'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'span',
     'widget'
 }
-
 
 class Parser:
     def __init__(self, dashboard_generator=None):
@@ -54,31 +52,52 @@ class Parser:
         footer_elements = []
         other_elements = []
 
-        # Find specific sections and parse them
-        nav_tag = root.find('nav', recursive=True)
-        if nav_tag:
-            nav_elements.extend(self.parse_element(nav_tag, current_anchors, next_anchor_id))
+        # Track processed top-level structural tags
+        processed_top_level_tags = set()
 
-        header_tag = root.find('header', recursive=True)
+        header_tag = root.find('header', recursive=False) # Only look for direct child header
         if header_tag:
             header_elements.extend(self.parse_element(header_tag, current_anchors, next_anchor_id))
+            processed_top_level_tags.add(header_tag)
 
-        main_tag = root.find('main', recursive=True)
+        nav_tag = root.find('nav', recursive=False) # Only look for direct child nav
+        # Ensure nav is not already processed as part of header
+        if nav_tag and nav_tag not in processed_top_level_tags and not (header_tag and header_tag.find('nav', recursive=True) == nav_tag):
+            nav_elements.extend(self.parse_element(nav_tag, current_anchors, next_anchor_id))
+            processed_top_level_tags.add(nav_tag)
+
+
+        main_tag = root.find('main', recursive=False) # Only look for direct child main
         if main_tag:
-            # Parse only direct children of 'main' to avoid re-parsing nav/header/footer if they are inside main
+            # Parse only direct children of 'main' that haven't been processed
             for child in main_tag.children:
+                if isinstance(child, (Comment, Doctype)):
+                    continue
+                # Ensure child.name is not None before calling .lower()
+                if hasattr(child, 'name') and child.name and child in processed_top_level_tags:
+                    continue # Skip if already processed as a direct top-level tag
                 main_elements.extend(self.parse_element(child, current_anchors, next_anchor_id))
+            processed_top_level_tags.add(main_tag)
         else:
             # If no explicit 'main' tag, parse top-level children that are not nav, header, or footer
+            # and not already processed.
             for child in root.children:
-                if getattr(child, 'name', None) not in ['nav', 'header', 'footer', 'title', 'script', 'style', 'noscript']:
-                    other_elements.extend(self.parse_element(child, current_anchors, next_anchor_id))
+                if isinstance(child, (Comment, Doctype)):
+                    continue
+                # Ensure child.name is not None before calling .lower()
+                if hasattr(child, 'name') and child.name and child.name.lower() in ['nav', 'header', 'footer', 'title', 'script', 'style', 'noscript']:
+                    continue # These are handled specifically or ignored
+                if hasattr(child, 'name') and child in processed_top_level_tags:
+                    continue # Skip if already processed as a direct top-level tag
+                other_elements.extend(self.parse_element(child, current_anchors, next_anchor_id))
 
 
-        footer_tag = root.find('footer', recursive=True)
-        if footer_tag:
+        footer_tag = root.find('footer', recursive=False) # Only look for direct child footer
+        # Ensure footer is not already processed as part of header/main/nav
+        if footer_tag and footer_tag not in processed_top_level_tags and not (header_tag and header_tag.find('footer', recursive=True) == footer_tag) and not (main_tag and main_tag.find('footer', recursive=True) == footer_tag):
             footer_elements.extend(self.parse_element(footer_tag, current_anchors, next_anchor_id))
-            
+            processed_top_level_tags.add(footer_tag)
+
         # Assemble elements in the desired order
         final_elements = []
         # Add page title first if it exists
@@ -86,12 +105,11 @@ class Parser:
             if isinstance(el, Title):
                 final_elements.append(el)
                 break
-        
-        final_elements.extend(nav_elements)
+
         final_elements.extend(header_elements)
+        final_elements.extend(nav_elements)
         final_elements.extend(main_elements if main_elements else other_elements) # Use main_elements if present, else other
         final_elements.extend(footer_elements)
-
 
         return final_elements, page_title
 
@@ -183,7 +201,7 @@ class Parser:
                         for child in tag.contents
                         for element in self.parse_element(child, current_anchors, next_anchor_id)]
             return [Nav(elements)]
-        
+
         if tag_name == 'header':
             elements = [element
                         for child in tag.contents
@@ -195,7 +213,7 @@ class Parser:
                         for child in tag.contents
                         for element in self.parse_element(child, current_anchors, next_anchor_id)]
             return [Footer(elements)]
-
+        
 
         if tag_name == 'widget':
             widget_type = tag.get('type')
@@ -231,10 +249,17 @@ class Parser:
                 continue
 
             tag_name = node.name.lower()
+
+            if tag_name == 'code':
+                raw = ''.join(str(c) for c in node.contents)
+                parsed.append(TextNode(raw))
+                continue
+
             text = node.get_text(strip=True)
 
             if tag_name in {'script', 'style', 'noscript', 'title'}:
                 continue
+
 
             if tag_name == 'a':
                 href = node.get('href', '#')

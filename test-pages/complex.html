@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Complex HTML Page</title>
+  <style>
+    :root {
+      --bg: #f4f4f4;
+      --text: #222;
+      --accent: #007bff;
+    }
+    [data-theme="dark"] {
+      --bg: #121212;
+      --text: #eee;
+      --accent: #66b2ff;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      transition: background 0.3s, color 0.3s;
+    }
+    header {
+      background: var(--accent);
+      color: white;
+      padding: 1rem;
+    }
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin-left: 1rem;
+    }
+    .hero {
+      background: linear-gradient(to right, var(--accent), #4facfe);
+      color: white;
+      padding: 4rem 2rem;
+      text-align: center;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 1fr 3fr;
+      gap: 2rem;
+      padding: 2rem;
+    }
+    aside {
+      background: #e8e8e8;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+    main {
+      display: grid;
+      gap: 2rem;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1.5rem;
+    }
+    .card {
+      background: white;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+    }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    footer {
+      background: #333;
+      color: white;
+      text-align: center;
+      padding: 1rem;
+      margin-top: 2rem;
+    }
+    .toggle {
+      cursor: pointer;
+      background: white;
+      color: var(--accent);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      border: none;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <nav>
+      <h1>🌐 Complex Page</h1>
+      <div>
+        <a href="#">Home</a>
+        <a href="#">Features</a>
+        <a href="#">Blog</a>
+        <a href="#">Contact</a>
+        <button class="toggle" onclick="toggleTheme()">🌓</button>
+      </div>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h2>Welcome to a Modern HTML Page</h2>
+    <p>With dark mode, cards, form, grid layout, and more 🚀</p>
+  </section>
+
+  <div class="container">
+    <aside>
+      <h3>Sidebar</h3>
+      <p>This is an example of a sticky sidebar with helpful links or widgets.</p>
+    </aside>
+
+    <main>
+      <section>
+        <h2>💳 Card Gallery</h2>
+        <div class="cards">
+          <div class="card">
+            <h3>Card One</h3>
+            <p>This is a sample card with some basic text and a little extra flair.</p>
+          </div>
+          <div class="card">
+            <h3>Card Two</h3>
+            <p>Another card, showcasing modern UI with hover animations.</p>
+          </div>
+          <div class="card">
+            <h3>Card Three</h3>
+            <p>Each card is responsive and adapts to your screen size.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>📬 Contact Us</h2>
+        <form>
+          <div class="form-group">
+            <label for="name">Name</label>
+            <input id="name" type="text" placeholder="Your Name" />
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input id="email" type="email" placeholder="you@example.com" />
+          </div>
+          <div class="form-group">
+            <label for="message">Message</label>
+            <textarea id="message" rows="4" placeholder="Type something nice..."></textarea>
+          </div>
+          <button type="submit" class="toggle">Send ✉️</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>© 2025 Complex HTML Page</p>
+  </footer>
+
+  <script>
+    function toggleTheme() {
+      const theme = document.documentElement.getAttribute("data-theme");
+      if (theme === "dark") {
+        document.documentElement.removeAttribute("data-theme");
+      } else {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    }
+  </script>
+</body>
+</html>

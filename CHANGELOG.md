@@ -4,6 +4,52 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 ---
 
+## 1.2.3 — Source Polish & Layout Fixes  
+**Release Date:** August 2, 2025
+
+### ✨ Improvements  
+- **Refined Source View Rendering**  
+  Enhanced the `source` command output for better formatting consistency and reduced color bleed on malformed tags.  
+  Now handles complex attributes and nested tags.
+
+- **Modular Button Rendering**  
+  Buttons now inherit from the `Box` base class, ensuring consistent layout and easier future structuring updates.  
+  This change improves modularity across UI components.
+
+- **Relative URL Support**  
+  Link like a href="/about" can now be handle correctly.
+
+
+### 🐞 Bug Fixes  
+- **Navigation Duplication**  
+  Fixed a bug where `<nav>` tag in header could appear twice in the rendered output.  
+  Now renders only once, preserving semantic structure.
+
+- **Complex Tags Rendering Compatibility**  
+  Improved partial rendering support for tags with complex or densely packed attributes.  
+  These are now displayed more cleanly instead of defaulting to raw HTML dump.
+
+---
+
+## 1.2.2 — View Source 
+**Release Date:** August 1, 2025
+
+### ✨ Feature Additions
+- **View Raw HTML with Color Highlighting:**  
+  Added a new `source` command that displays the original HTML of the current page.  
+  Uses syntax-aware formatting:
+  - 🟦 **Tag names** in blue  
+  - 🟠 **Attributes and values** in orange
+  - ⚪ **Text content** in white  
+  - ⬜ **Brackets and slashes** in gray  
+
+  This makes it easy to inspect and debug page structure directly from the terminal.
+
+### ⚠️ Issue Raise
+- Some complex tag with many attribute can be not rendered as normal, it will show full HTML code.
+
+---
+
 ## 1.2.1 — Two Structural Semantic Tags Supported 
 **Release Date:** August 1, 2025
 
