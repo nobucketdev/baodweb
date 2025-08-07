@@ -1,3 +1,5 @@
+# parser.py
+
 import sys
 from bs4 import BeautifulSoup, Comment, Doctype
 import re
@@ -6,9 +8,9 @@ from core.elements import *
 SUPPORTED_TAGS = {
     'html', 'body', 'section', 'article', 'main', 'div',
     'header', 'footer',
-    'h1', 'h2', 'h3', 'p', 'ul', 'ol', 'li', 'a', 'button', 'img', 'nav',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ,'p', 'ul', 'ol', 'li', 'a', 'button', 'img', 'nav',
     'table', 'thead', 'tbody', 'tr', 'th', 'td', 'strong', 'b', 'em', 'i', 'u', 'del', 'ins', 'mark', 'sub', 'sup', 'span',
-    'widget'
+    'widget', 'hr'
 }
 
 class Parser:
@@ -113,7 +115,7 @@ class Parser:
 
         return final_elements, page_title
 
-    def parse_element(self, tag, current_anchors=None, next_anchor_id=None):
+    def parse_element(self, tag, current_anchors=None, next_anchor_id=None, inline_context=False):
         if isinstance(tag, str):
             text = tag.strip()
             return [TextNode(text)] if text else []
@@ -134,6 +136,9 @@ class Parser:
         if tag_name in {'h1', 'h2', 'h3'}:
             return [Heading(text, level=int(tag_name[1]))]
 
+        if tag_name == 'hr':
+            return [HorizontalRule()]
+
         if tag_name == 'p':
             return [Paragraph(self._parse_inline_content(tag, current_anchors, next_anchor_id))]
 
@@ -150,7 +155,10 @@ class Parser:
             return [Anchor(text, href, current_anchors, next_anchor_id)]
 
         if tag_name == 'button':
+            if inline_context:
+                return [TextNode(f"{BOLD}{text}{RESET}")]  # Or styled version like InlineButton if you have one
             return [Button(text)]
+
 
         if tag_name == 'img':
             src = tag.get('src')
@@ -213,7 +221,7 @@ class Parser:
                         continue
                     name = child.name.lower()
                     if name in allowed_nav_tags:
-                        output.extend(self.parse_element(child, current_anchors, next_anchor_id))
+                        output.extend(self.parse_element(child, current_anchors, next_anchor_id, inline_context=True))
                     elif name in {'div', 'section', 'article'}:
                         output.extend(extract_nav_content(child))  # recursive dive
                 return output
@@ -284,6 +292,10 @@ class Parser:
                 href = node.get('href', '#')
                 if text:
                     parsed.append(Anchor(text, href, current_anchors, next_anchor_id))
+                    
+            elif tag_name == 'button':
+                parsed.append(Button(text))
+
 
             elif tag_name == 'img':
                 src = node.get('src')

@@ -1,13 +1,14 @@
 import io
 import re
 import sys
-import shutil
+import shutil, unicodedata
 from textwrap import wrap
 from wcwidth import wcswidth
 import requests
 from core.braillify import braillify
 from core.image_render import image_to_terminal_art
 from core.ansi import *
+
 
 class Box:
     # Unicode border characters
@@ -132,12 +133,29 @@ class Box:
             self._border_chars = self.BORDER_CHARS_NONE
 
     def _visible_width(self, text):
-        """Calculates the visible width of a string, ignoring ANSI escape codes."""
-        clean_text = re.sub(r'\x1b\[[0-9;]*m', '', text)
-        return wcswidth(clean_text)
+        """
+        Calculates the visible width of a string:
+        - Strips ANSI escape codes
+        - Properly accounts for wide/fullwidth Unicode characters
+        - Ignores zero-width characters
+        """
+        # Remove ANSI codes
+        no_ansi = ANSI_ESCAPE.sub('', text)
+
+        # Normalize the string and filter out non-visible characters
+        cleaned = ''.join(
+            ch for ch in no_ansi
+            if unicodedata.category(ch)[0] != 'C'  # Skip control characters
+            and not unicodedata.combining(ch)      # Skip diacritics/zero-width
+        )
+
+        # Calculate display width
+        return wcswidth(cleaned)
 
     def render(self, enable_color=True):
         terminal_width, terminal_height = shutil.get_terminal_size(fallback=(100, 20))
+        border_color = self.border_color_code if enable_color else ""
+        reset = RESET if enable_color else ""
 
         actual_start_x_with_margin = self._start_x_init if self._start_x_init is not None else 0
         actual_start_y_with_margin = self._start_y_init if self._start_y_init is not None else 0
@@ -158,84 +176,52 @@ class Box:
 
         box_width = box_end_x - box_start_x + 1
 
-        # Total fixed horizontal overhead = 2 (vertical border characters) + 2 * padding_x
-        total_horizontal_overhead = 2 + (2 * self.padding_x)
-
-        min_content_area_for_title = 0
+        total_horizontal_overhead = (
+            (2 if self.border_style in [1, 2] else 0)
+            + (2 * self.padding_x)
+        )
+        
+        min_box_width_required = total_horizontal_overhead
         if self.box_title:
-            min_content_area_for_title = self._visible_width(self.box_title) + 2
+            min_title_width = self._visible_width(self.box_title) + 2 + total_horizontal_overhead
+            min_box_width_required = max(min_box_width_required, min_title_width)
 
-        min_box_width_required = max(min_content_area_for_title + total_horizontal_overhead, total_horizontal_overhead)
-
-        if box_width < min_box_width_required:
-            box_width = min_box_width_required
-            box_end_x = box_start_x + box_width - 1
-            if box_end_x >= terminal_width:
-                box_width = terminal_width - box_start_x
-                box_end_x = terminal_width - 1
-
-        rendered_children_lines = []
+        # --- Step 1: Render all children to find max content width and height ---
+        max_child_content_width = 0
+        rendered_child_lines = []
         for element in self.elements:
-            if hasattr(element, 'tag_type') and element.tag_type == 'nav':
-                nav_render = element.render(enable_color).rstrip('\n')
-                rendered_children_lines.extend(nav_render.split('\n'))
-            else:
-                child_output = element.render(enable_color).rstrip('\n')
-                rendered_children_lines.extend(child_output.split('\n'))
+            child_output = element.render(enable_color).rstrip('\n')
+            child_lines = child_output.split('\n')
+            rendered_child_lines.extend(child_lines)
+            for line in child_lines:
+                max_child_content_width = max(max_child_content_width, self._visible_width(line))
 
-
-        content_lines = rendered_children_lines
-        if not content_lines:
-            content_lines = [""]
-
-        border_color = self.border_color_code if enable_color else ""
-        reset = RESET if enable_color else ""
-
-        max_text_content_width = box_width - total_horizontal_overhead
-        if max_text_content_width < 0:
-            max_text_content_width = 0
-
-        # NEW LOGIC: Wrap lines of text to fit the content area while preserving ANSI codes
-        wrapped_lines = []
-        for line in content_lines:
-            current_line = ""
-            current_width = 0
-            
-            # This regex splits the line into either ANSI codes or single characters.
-            # This allows us to process them separately.
-            ansi_or_char_pattern = re.compile(r'(\x1b\[[0-9;]*m)|(.)', re.DOTALL)
-            
-            for match in ansi_or_char_pattern.finditer(line):
-                ansi_code = match.group(1)
-                char = match.group(2)
-                
-                if ansi_code:
-                    # If it's an ANSI code, just append it to the current line buffer.
-                    # It doesn't contribute to the visible width.
-                    current_line += ansi_code
-                elif char:
-                    char_width = wcswidth(char)
-                    if current_width + char_width > max_text_content_width and current_width > 0:
-                        # If the next character would exceed the width, start a new line.
-                        wrapped_lines.append(current_line)
-                        current_line = char
-                        current_width = char_width
-                    else:
-                        current_line += char
-                        current_width += char_width
-            
-            # Append the last line segment
-            if current_line:
-                wrapped_lines.append(current_line)
-
-        if not wrapped_lines:
-            wrapped_lines = [""]
-
-        # Pad and align each wrapped line
+        # --- Step 2: Calculate final box width and content area width ---
+        min_box_width_for_children = max_child_content_width + total_horizontal_overhead
+        
+        # Determine the final width of the content area
+        content_area_width = max(
+            box_width - total_horizontal_overhead,
+            max_child_content_width,
+            (min_box_width_required - total_horizontal_overhead) if min_box_width_required > 0 else 0
+        )
+        
+        box_width = content_area_width + total_horizontal_overhead
+        
+        # Ensure box doesn't exceed terminal width
+        if box_start_x + box_width > terminal_width:
+            box_width = terminal_width - box_start_x
+            content_area_width = box_width - total_horizontal_overhead
+            if content_area_width < 0: content_area_width = 0
+        
+        box_end_x = box_start_x + box_width - 1
+        
+        # --- Step 3: Align and pad the pre-rendered child lines ---
         processed_padded_lines = []
-        for line in wrapped_lines:
+        for line in rendered_child_lines:
             line_width = self._visible_width(line)
-            additional_padding_needed = max_text_content_width - line_width
+            additional_padding_needed = max(0, content_area_width - line_width)
+            
             dynamic_left_pad = 0
             dynamic_right_pad = 0
 
@@ -254,93 +240,142 @@ class Box:
                 ' ' * self.padding_x
             )
 
-            rendered_inner_line_width = self._visible_width(line_to_add_inner)
-            if rendered_inner_line_width < (box_width - 2):
-                line_to_add_inner += ' ' * ((box_width - 2) - rendered_inner_line_width)
-            elif rendered_inner_line_width > (box_width - 2):
-                # Truncate if the line is somehow too long
-                line_to_add_inner = line_to_add_inner[:(box_width - 2)]
+            current_line_rendered_width = self._visible_width(line_to_add_inner)
+            if current_line_rendered_width < (box_width - total_horizontal_overhead):
+                line_to_add_inner += ' ' * ((box_width - total_horizontal_overhead) - current_line_rendered_width)
+            elif current_line_rendered_width > (box_width - total_horizontal_overhead):
+                # We need to truncate from the end, but be careful with ANSI codes
+                visible_chars_to_keep = box_width - total_horizontal_overhead
+                truncated_line = ""
+                visible_count = 0
+                
+                # Create a list of (character, is_ansi) tuples
+                parts = []
+                last_end = 0
+                for match in ANSI_ESCAPE.finditer(line_to_add_inner):
+                    if match.start() > last_end:
+                        for char in line_to_add_inner[last_end:match.start()]:
+                            parts.append((char, False))
+                    parts.append((match.group(0), True))
+                    last_end = match.end()
+                if last_end < len(line_to_add_inner):
+                    for char in line_to_add_inner[last_end:]:
+                        parts.append((char, False))
+
+                current_width = 0
+                for char, is_ansi in parts:
+                    if is_ansi:
+                        truncated_line += char
+                    else:
+                        char_width = wcswidth(char)
+                        if current_width + char_width <= visible_chars_to_keep:
+                            truncated_line += char
+                            current_width += char_width
+                        else:
+                            break
+                line_to_add_inner = truncated_line
 
             processed_padded_lines.append(line_to_add_inner)
 
+        if not processed_padded_lines:
+            processed_padded_lines = [" " * (content_area_width)]
 
-        calculated_content_height = len(processed_padded_lines) + 2 + (2 * self.padding_y)
+        # --- Step 4: Calculate final box height and vertical padding ---
+        calculated_content_lines_count = len(processed_padded_lines)
+        required_content_height = calculated_content_lines_count + (2 * self.padding_y)
 
         if self._end_y_init is None:
-            box_height = calculated_content_height
+            box_height = required_content_height + (2 if self.border_style in [1, 2] else 0)
             box_end_y = box_start_y + box_height - 1
             actual_end_y_with_margin = box_end_y + self.margin_y
         else:
             actual_end_y_with_margin = self._end_y_init if self._end_y_init is not None else terminal_height - 1
             box_end_y = actual_end_y_with_margin - self.margin_y
             box_height = box_end_y - box_start_y + 1
-
-        box_height = max(box_height, 2)
-
-        vertical_content_area_height = box_height - 2
-        required_content_lines_for_padding = len(processed_padded_lines) + (2 * self.padding_y)
+        
+        box_height = max(box_height, 2 if self.border_style in [1, 2] else 0)
+        
+        vertical_content_area_height = box_height - (2 if self.border_style in [1, 2] else 0)
 
         vertical_pad_top_inner = 0
         vertical_pad_bottom_inner = 0
-        if vertical_content_area_height > required_content_lines_for_padding:
-            extra_vertical_space = vertical_content_area_height - required_content_lines_for_padding
+        if vertical_content_area_height > required_content_height:
+            extra_vertical_space = vertical_content_area_height - required_content_height
             vertical_pad_top_inner = extra_vertical_space // 2
             vertical_pad_bottom_inner = extra_vertical_space - vertical_pad_top_inner
-
-        # Select border characters for the current render
+            
         selected_chars = self._border_chars
 
-        # Construct the top border with the title
-        top_border_fill = selected_chars['horizontal'] * (box_width - 2)
-        if self.box_title:
+        # --- Step 5: Construct the final output lines ---
+        output_lines_for_box_rendering = []
+        
+        horizontal_fill_width = box_width - (2 if self.border_style in [1, 2] else 0)
+
+        for _ in range(self.padding_y + vertical_pad_top_inner):
+            output_lines_for_box_rendering.append(
+                f"{border_color}{selected_chars['vertical']}{' ' * horizontal_fill_width}{selected_chars['vertical']}{reset}"
+            )
+
+        for line_content_padded in processed_padded_lines:
+            # Re-ensure padding and alignment is correct just before adding borders
+            line_width = self._visible_width(line_content_padded)
+            padding_right = max(0, horizontal_fill_width - line_width)
+            final_content_line = line_content_padded + ' ' * padding_right
+            
+            output_lines_for_box_rendering.append(
+                f"{border_color}{selected_chars['vertical']}{reset}{final_content_line}{border_color}{selected_chars['vertical']}{reset}"
+            )
+            
+        for _ in range(self.padding_y + vertical_pad_bottom_inner):
+            output_lines_for_box_rendering.append(
+                f"{border_color}{selected_chars['vertical']}{' ' * horizontal_fill_width}{selected_chars['vertical']}{reset}"
+            )
+            
+        top_border_fill = selected_chars['horizontal'] * horizontal_fill_width
+        
+        if self.box_title and self.border_style in [1, 2]:
             title_text = self.box_title
             title_width = self._visible_width(title_text)
+            title_space_around = 2
+            
+            if title_width + title_space_around > horizontal_fill_width:
+                title_text = title_text[:self._visible_width(title_text) - (title_width + title_space_around - horizontal_fill_width)]
 
-            dashes_after_title = (box_width - 2) - (title_width + 2)
-            if dashes_after_title < 0:
-                dashes_after_title = 0
-
+            left_dashes = (horizontal_fill_width - self._visible_width(title_text) - 2) // 2
+            right_dashes = horizontal_fill_width - self._visible_width(title_text) - 2 - left_dashes
+            
             top_border = (
-                f"{border_color}{selected_chars['top_left']}{selected_chars['horizontal']}{title_text}{selected_chars['horizontal']}" +
-                selected_chars['horizontal'] * dashes_after_title +
+                f"{border_color}{selected_chars['top_left']}"
+                f"{selected_chars['horizontal'] * left_dashes}"
+                f" {title_text} "
+                f"{selected_chars['horizontal'] * right_dashes}"
                 f"{selected_chars['top_right']}{reset}"
             )
         else:
             top_border = f"{border_color}{selected_chars['top_left']}{top_border_fill}{selected_chars['top_right']}{reset}"
 
-        bottom_border = f"{border_color}{selected_chars['bottom_left']}{selected_chars['horizontal'] * (box_width - 2)}{selected_chars['bottom_right']}{reset}"
+        bottom_border = f"{border_color}{selected_chars['bottom_left']}{selected_chars['horizontal'] * horizontal_fill_width}{selected_chars['bottom_right']}{reset}"
 
-        output_lines_for_box_rendering = []
+        # If borders are enabled, add them
+        if self.border_style in [1, 2]:
+            full_box_output = [top_border] + output_lines_for_box_rendering + [bottom_border]
+        else:
+            full_box_output = output_lines_for_box_rendering
 
-        # Add top padding_y rows and vertical center padding
-        for _ in range(self.padding_y + vertical_pad_top_inner):
-            output_lines_for_box_rendering.append(f"{border_color}{selected_chars['vertical']}{' ' * (box_width - 2)}{selected_chars['vertical']}{reset}")
-
-        # Add processed content lines
-        for line_content_padded in processed_padded_lines:
-            output_lines_for_box_rendering.append(f"{border_color}{selected_chars['vertical']}{reset}{line_content_padded}{border_color}{selected_chars['vertical']}{reset}")
-
-        # Add bottom padding_y rows and vertical center padding
-        for _ in range(self.padding_y + vertical_pad_bottom_inner):
-            output_lines_for_box_rendering.append(f"{border_color}{selected_chars['vertical']}{' ' * (box_width - 2)}{selected_chars['vertical']}{reset}")
-
-        full_box_output = [top_border] + output_lines_for_box_rendering + [bottom_border]
-
-        # Apply Margin
         final_rendered_block = []
+        
+        if self.margin_y > 0:
+            margin_line_width = box_width + 2 * self.margin_x
+            for _ in range(self.margin_y):
+                final_rendered_block.append(' ' * margin_line_width)
 
-        # Add top margin
-        for _ in range(self.margin_y):
-            # Width of the line including horizontal margins (box_width + 2 * margin_x)
-            final_rendered_block.append(' ' * (box_width + 2 * self.margin_x))
-
-        # Add box with horizontal margins
         for line in full_box_output:
             final_rendered_block.append(' ' * self.margin_x + line + ' ' * self.margin_x)
 
-        # Add bottom margin
-        for _ in range(self.margin_y):
-            final_rendered_block.append(' ' * (box_width + 2 * self.margin_x))
+        if self.margin_y > 0:
+            margin_line_width = box_width + 2 * self.margin_x
+            for _ in range(self.margin_y):
+                final_rendered_block.append(' ' * margin_line_width)
 
         return "\n".join(final_rendered_block) + "\n"
     
@@ -444,10 +479,12 @@ class Heading:
                 if self.level == 1:
                     style = f"{BOLD}{BLUE_FG}" # Blue for h1 in inline contexts
                 elif self.level == 2:
-                    style = f"{BOLD}{GREEN_FG}"
+                    style = f"{BOLD}{MINT_GREEN_FG}"
+                elif self.level == 3:
+                    style = f"{BOLD}{SUNNY_YELLOW_FG}"
                 else:
-                    style = f"{BOLD}{YELLOW_FG}"
-            return f"{style}{'#' * self.level} {self.text}{RESET}"
+                    style = f"{BOLD}{LIGHT_BRICK_FG}"
+            return f"\n{style}{'#' * self.level} {self.text}{RESET}"
         else: # Original h1 braille art rendering
             braille = braillify(self.text, color=enable_color)
             return f"\n{braille}\n\n"
@@ -697,15 +734,13 @@ class ImageElement:
             if self.src.startswith("/"):
                 if self.base_url:
                     image_url = self.base_url.rstrip("/") + self.src
-                else:
-                    image_url = "https://www.google.com" + self.src
 
             response = requests.get(image_url, timeout=5)
             response.raise_for_status()
             image_file = io.BytesIO(response.content)
 
-            target_w = int(self.width) // 4 if self.width else None
-            target_h = int(self.height) // 5 if self.height else None
+            target_w = int(self.width // 4) if self.width else None
+            target_h = int(self.height // 5) if self.height else None
 
             output = io.StringIO()
             sys_stdout_backup = sys.stdout
@@ -721,7 +756,8 @@ class ImageElement:
             return f"\n{output.getvalue()}[Image: {self.alt if self.alt else self.src}]\n"
 
         except Exception as e:
-            return f"[Image]"
+            return f"[Image: {self.alt if self.alt else self.src}]"
+
 class Nav:
     def __init__(self, elements):
         self.elements = elements
@@ -731,69 +767,77 @@ class Nav:
         clean_text = re.sub(r'\x1b\[[0-9;]*m', '', text)
         return wcswidth(clean_text)
 
+
     def render(self, enable_color=True):
         if not self.elements:
             return ""
 
-        terminal_width = shutil.get_terminal_size((100, 20)).columns
-
-        # Render individual elements and measure them
+        # === 1. Render all elements and find the maximum width ===
         rendered_parts_info = []
+        max_width = 0
+        min_padding = 1
+
         for element in self.elements:
-            if isinstance(element, Heading) and element.level == 1:
-                rendered_text = element.render(enable_color=enable_color, inline=True).strip()
-            else:
-                rendered_text = element.render(enable_color).strip()
+            if hasattr(element, "render"):
+                # --- NEW LOGIC: Temporarily disable button borders ---
+                original_border_style = getattr(element, 'border_style', None)
+                is_button = isinstance(element, Button)
+                if is_button:
+                    element.border_style = 0
 
-            visible_w = self._visible_width(rendered_text)
-            rendered_parts_info.append((rendered_text, visible_w))
+                # --- OLD LOGIC ---
+                # rendered_text = element.render(enable_color=enable_color).strip()
 
-        num_items = len(rendered_parts_info)
-        if num_items == 0:
-            return ""
-
-        min_padding = 2
-        inner_borders = num_items - 1
-        outer_borders = 2
-
-        # Compute individual column widths with padding
-        base_cell_widths = [w + 2 * min_padding for _, w in rendered_parts_info]
-        total_width = sum(base_cell_widths) + inner_borders + outer_borders
-        cell_widths = base_cell_widths
-
-        # Cap if somehow overflow
-        max_total = min(total_width, terminal_width - 2)
-
-        def make_border(left, mid, right, fill):
-            return left + mid.join(fill * w for w in cell_widths) + right
-
-        top_border = make_border("╭", "┬", "╮", "─")
-        bottom_border = make_border("╰", "┴", "╯", "─")
-
-        # Build content row
-        content_cells = []
-        for i, (text, visible_w) in enumerate(rendered_parts_info):
-            cell_width = cell_widths[i]
-            total_padding = cell_width - visible_w
-            left_pad = total_padding // 2
-            right_pad = total_padding - left_pad
-            content_cells.append(" " * left_pad + text + " " * right_pad)
-
-        content_line = "│" + "│".join(content_cells) + "│"
-
-        # Build final output
-        output_lines = [top_border, content_line, bottom_border]
-
-        return "\n".join(output_lines) + "\n" 
+                # --- NEW LOGIC: Pass inline=True if the render method supports it ---
+                if hasattr(element.render, '__code__') and 'inline' in element.render.__code__.co_varnames:
+                    rendered_text = element.render(enable_color=enable_color, inline=True).strip()
+                else:
+                    rendered_text = element.render(enable_color=enable_color).strip()
 
 
+                visible_w = self._visible_width(rendered_text)
+                rendered_parts_info.append((rendered_text, visible_w))
+                if visible_w > max_width:
+                    max_width = visible_w
+
+                # --- NEW LOGIC: Restore original border style ---
+                if is_button and original_border_style is not None:
+                    element.border_style = original_border_style
+
+        # The total width of each cell, including padding and borders
+        cell_total_width = max_width + 2 * min_padding
+        
+        final_output = []
+
+        # === 2. Create the top border ===
+        top_border = "╭" + "─" * cell_total_width + "╮"
+        final_output.append(top_border)
+
+        # === 3. Render each element with the consistent width ===
+        for i, (text, w) in enumerate(rendered_parts_info):
+            # Content line with padding to align text to the left
+            left_pad = min_padding
+            right_pad = cell_total_width - w - left_pad
+            content_line = "│" + " " * left_pad + text + " " * right_pad + "│"
+            final_output.append(content_line)
+
+            # Add a middle border if it's not the last element
+            if i < len(rendered_parts_info) - 1:
+                middle_border = "├" + "─" * cell_total_width + "┤"
+                final_output.append(middle_border)
+
+        # === 4. Create the bottom border ===
+        bottom_border = "╰" + "─" * cell_total_width + "╯"
+        final_output.append(bottom_border)
+
+        return "\n".join(final_output) + "\n"
+    
 class Header(Box):
     def __init__(self, elements, start_x=0, end_x=None, border_color_code=BLUE_FG,
-                 element_alignment='center', padding_x=1, padding_y=0, margin_x=0, margin_y=0):
+                 element_alignment='left', padding_x=1, padding_y=0, margin_x=0, margin_y=0):
         super().__init__(
             elements=elements,
             tag_type='header',
-            box_title="Header",
             start_x=start_x,
             start_y=0,
             end_x=end_x,
@@ -806,11 +850,10 @@ class Header(Box):
 
 class Footer(Box):
     def __init__(self, elements, start_x=0, end_x=None, border_color_code=WHITE_FG,
-                 element_alignment='center', padding_x=1, padding_y=0, margin_x=0, margin_y=0):
+                 element_alignment='left', padding_x=1, padding_y=0, margin_x=0, margin_y=0):
         super().__init__(
             elements=elements,
             tag_type='footer',
-            box_title="Footer",
             start_x=start_x,
             start_y=None, # Typically positioned by a layout manager at the bottom
             end_x=end_x,
@@ -825,33 +868,10 @@ class WidgetElement(Box):
     def __init__(self, widget_type, dashboard_generator,
                  start_x=0, start_y=0, box_width=60, end_y=None, # box_width for convenience
                  border_color_code=WHITE_FG, element_alignment='left',
-                 padding_x=1, padding_y=0, margin_x=2, margin_y=1): # Added default margin for widgets
+                 padding_x=1, padding_y=0, margin_x=0, margin_y=1): # Added default margin for widgets
 
         self.widget_type = widget_type
         self.dashboard_generator = dashboard_generator
-
-        # Calculate end_x based on start_x and desired box_width, accounting for margins
-        # The box_width here is the desired width *including* padding and borders, but *excluding* margin
-        # So the actual end_x for BoxedContent should be start_x_with_margin + box_width + 2*margin_x - 1
-        # No, the BoxedContent's start_x and end_x are where the *full rendered block including margin* starts/ends.
-        # So, if we want a `box_width` (border-to-border) of 40, and margin_x=2:
-        # The total width on the terminal is `2*margin_x + box_width`.
-        # So, end_x for BoxedContent should be `start_x_init + (2 * margin_x) + box_width - 1`.
-
-        # Let's adjust the interpretation: `start_x` and `end_x` for BoxedContent already
-        # account for the margin space if they are passed. The `box_width` here should be
-        # the *internal* box width that the user wants to set.
-
-        # So, the actual width that BoxedContent will calculate for `box_width` (border to border)
-        # from `end_x - start_x + 1` should be `(given end_x - given start_x + 1) - (2 * margin_x)`.
-
-        # Let's keep `start_x` and `end_x` for BoxedContent as the *outermost* coordinates
-        # (including margin). The `box_width` in WidgetElement should then define the
-        # width *from border to border*.
-
-        # The `start_x` and `end_x` for BoxedContent already include the margin as the outermost bounds.
-        # If `box_width` is passed, it should define the *actual content width + padding + border*.
-        # So, the `end_x` passed to BoxedContent must be `start_x + box_width_desired + 2*margin_x - 1`
 
         total_rendered_width = box_width + (2 * margin_x)
         calculated_end_x = start_x + total_rendered_width - 1
@@ -908,3 +928,14 @@ class WidgetElement(Box):
 
         self.elements = original_elements
         return rendered_output
+    
+class HorizontalRule:
+    def __init__(self):
+        self.tag_type = 'hr'
+
+    def render(self, enable_color=True):
+        terminal_width, _ = shutil.get_terminal_size(fallback=(80, 20))
+        line = "─" * terminal_width
+        if enable_color:
+            return f"{WHITE_FG}{line}{RESET}\n"
+        return f"{line}\n"

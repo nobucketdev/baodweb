@@ -4,63 +4,93 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 ---
 
+## 1.3.0 — Fixes, Box Refinement & ANSI Test
+**Release Date:** August 7, 2025
+
+### ✅ Improvements & Fixes
+
+- **Nav & Button Rendering Conflict Resolved:**
+  Fixed layout contradiction where `<button>` elements inside `<nav>` rendered incorrectly or were ignored.
+  Buttons now render **inline** alongside other nav elements like `<a>` and `<span>`, following semantic intent.
+
+- **Table Rendering Stability:**
+  Addressed layout inconsistencies in tables with missing cells or uneven rows.
+  - Supports cleaner column alignment
+  - Handles malformed `<tr>`/`<td>` gracefully
+  - Prevents visual corruption in tight layouts
+
+- **Box System Refinement:**
+  Structural containers (`<header>`, `<footer>`, `<main>`, `<section>`) now have:
+  - Improved spacing between stacked boxes
+  - Consistent padding/margin behavior
+  - Smarter handling of empty containers (no more layout breaks)
+
+- **ANSI Test Feature Added:**
+  New feature to **test ANSI rendering compatibility** in your terminal.
+  - Outputs color/style samples (bold, underline, inverse, etc.)
+  - Helps verify terminal theme, background contrast, and rendering behavior
+  - Optional debug tool, useful for troubleshooting display issues
+
+
+---
+
 ## 1.2.4 — Navigation Enhancement & Resolve URL
 **Release Date:** August 2, 2025
 
 ### ✅ Improvements & fixes
-- **Nested Link Parsing in `<nav>`:**  
+- **Nested Link Parsing in `<nav>`:**
   Resolved an issue where non-container tags inside `<div>` or `<section>` inside a `<nav>` were ignored. Navigation bar now recursively picks up valid inline elements only.
 
-- **Navigation Layout Overflow:**  
+- **Navigation Layout Overflow:**
   Navigation bar now **dynamically adjusts width** based on actual content, preventing ugly terminal overflow or full-width stretching.
 
 - Navigation rendering accepts non-container tags only (e.g., `<a>`, `<button>`, `<p>`, `<span>`, etc.)
 - Safer, cleaner, semantic nav rendering with compatability complex structures.
 
 ### 🐛 Bug Fixes
-- **Fixed: Relative vs Global URL Confusion**  
+- **Fixed: Relative vs Global URL Confusion**
   Corrected the logic that was misinterpreting relative URLs as global ones (vice versa), improving navigation and resource handling.
 
 ---
 
-## 1.2.3 — Source Polish & Layout Fixes  
+## 1.2.3 — Source Polish & Layout Fixes
 **Release Date:** August 2, 2025
 
-### ✨ Improvements  
-- **Refined Source View Rendering**  
-  Enhanced the `source` command output for better formatting consistency and reduced color bleed on malformed tags.  
+### ✨ Improvements
+- **Refined Source View Rendering**
+  Enhanced the `source` command output for better formatting consistency and reduced color bleed on malformed tags.
   Now handles complex attributes and nested tags.
 
-- **Modular Button Rendering**  
-  Buttons now inherit from the `Box` base class, ensuring consistent layout and easier future structuring updates.  
+- **Modular Button Rendering**
+  Buttons now inherit from the `Box` base class, ensuring consistent layout and easier future structuring updates.
   This change improves modularity across UI components.
 
-- **Relative URL Support**  
+- **Relative URL Support**
   Link like a href="/about" can now be handle correctly.
 
 
-### 🐞 Bug Fixes  
-- **Navigation Duplication**  
-  Fixed a bug where `<nav>` tag in header could appear twice in the rendered output.  
+### 🐞 Bug Fixes
+- **Navigation Duplication**
+  Fixed a bug where `<nav>` tag in header could appear twice in the rendered output.
   Now renders only once, preserving semantic structure.
 
-- **Complex Tags Rendering Compatibility**  
-  Improved partial rendering support for tags with complex or densely packed attributes.  
+- **Complex Tags Rendering Compatibility**
+  Improved partial rendering support for tags with complex or densely packed attributes.
   These are now displayed more cleanly instead of defaulting to raw HTML dump.
 
 ---
 
-## 1.2.2 — View Source 
+## 1.2.2 — View Source
 **Release Date:** August 1, 2025
 
 ### ✨ Feature Additions
-- **View Raw HTML with Color Highlighting:**  
-  Added a new `source` command that displays the original HTML of the current page.  
+- **View Raw HTML with Color Highlighting:**
+  Added a new `source` command that displays the original HTML of the current page.
   Uses syntax-aware formatting:
-  - 🟦 **Tag names** in blue  
+  - 🟦 **Tag names** in blue
   - 🟠 **Attributes and values** in orange
-  - ⚪ **Text content** in white  
-  - ⬜ **Brackets and slashes** in gray  
+  - ⚪ **Text content** in white
+  - ⬜ **Brackets and slashes** in gray
 
   This makes it easy to inspect and debug page structure directly from the terminal.
 
@@ -69,77 +99,77 @@ All notable changes to **BaodWeb** will be documented in this file.
 
 ---
 
-## 1.2.1 — Two Structural Semantic Tags Supported 
+## 1.2.1 — Two Structural Semantic Tags Supported
 **Release Date:** August 1, 2025
 
 ### ✨ Feature Additions
-- **Header & Footer Support:**  
+- **Header & Footer Support:**
   Added native handling for `<header>` and `<footer>` tags.
 
-- **Early Access: Search Engine Integration:**  
+- **Early Access: Search Engine Integration:**
   Introduced basic search support using a hybrid engine setup.
 
 ### ⚠️ Known Issues
 - Old bugs still not fixed.
 
 ---
-## 1.2.0 — Alpha Polish  
+## 1.2.0 — Alpha Polish
 **Release Date:** July 31, 2025
 
-### 🧼 Visual & Code Polish  
+### 🧼 Visual & Code Polish
 Refined the layout, cleaned up code.
 
 ### ⚠️ Known Issues
 
-- **List-Table Layout Conflict:**  
+- **List-Table Layout Conflict:**
   Lists (`<ul>`, `<ol>`) inside tables still break alignment. No fix yet — avoid if you value structure.
 
-- **Alt Text Duplication:**  
+- **Alt Text Duplication:**
   Long `alt` texts may still repeat when scrolling.
 
 ---
 
 
-## 1.2.0-alpha — Layout & Render Overhaul  
+## 1.2.0-alpha — Layout & Render Overhaul
 **Release Date:** July 30, 2025
 
 ## ✦ What's New
 
-### 📏 Just-Fit Terminal Rendering  
+### 📏 Just-Fit Terminal Rendering
 The browser now intelligently adjusts content rendering to *precisely fit* your terminal's height — no more chopped-off content. It’s all tight, all clean.
 
 ### 🧭 Command and Title Bars
 
-- **Bottom Command Bar:**  
+- **Bottom Command Bar:**
   A persistent command input bar now stick at the very bottom of the terminal.
 
-- **Top Title Bar:**  
+- **Top Title Bar:**
   A dedicated title bar is now fixed at the top of the screen, showing the current page’s title to make navigation more intuitive.
 
-- **📝 "About" Page:**  
+- **📝 "About" Page:**
   New `about.html` available! Type `test about` or `click 4` on dashboard to open.
 
 ## ⚡ Performance & Stability
 
-- **Optimized Rendering:**  
+- **Optimized Rendering:**
   Major speed boosts and smoother rendering.
 
-- **Minor Issue Fixes:**  
+- **Minor Issue Fixes:**
   Patched various bugs and annoying glitches. Overall UX is now less janky and more joyful.
 
 ## ⚠️ Known Issues
 
-- **List-Table Layout Conflict:**  
+- **List-Table Layout Conflict:**
   List like `<ul>` or `<ol>` inside table cells (`<td>`) may break alignment. Expect a bit of chaos if you do that.
 
-- **Alt Text Duplication on Scroll:**  
+- **Alt Text Duplication on Scroll:**
   Sometimes, scrolling causes long `alt` texts to show up twice.
 
 ---
 
 
-## 1.1.2 — Style Polish & Render Boost  
-**Release Date:** July 28, 2025  
+## 1.1.2 — Style Polish & Render Boost
+**Release Date:** July 28, 2025
 
 ### ✦ What's Improved
 
@@ -154,8 +184,8 @@ The browser now intelligently adjusts content rendering to *precisely fit* your 
 ---
 
 
-## 1.1.1 — Bug Cleanup & Render Refactor  
-**Release Date:** July 27, 2025  
+## 1.1.1 — Bug Cleanup & Render Refactor
+**Release Date:** July 27, 2025
 
 ### ✦ What's Fixed
 
@@ -165,12 +195,12 @@ The browser now intelligently adjusts content rendering to *precisely fit* your 
 
 ### 🛠 Refactoring & Structure
 
-* **🧩 Code Modularization:**  
-  * Moved ANSI formatting to `ansi.py`  
-  * Moved image rendering logic to `utils/image_render.py`  
+* **🧩 Code Modularization:**
+  * Moved ANSI formatting to `ansi.py`
+  * Moved image rendering logic to `utils/image_render.py`
   This makes future maintenance easier and separates concerns cleanly.
 
-* **📄 Project Structure Enhancements:**  
+* **📄 Project Structure Enhancements:**
   * Added missing project docs: `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md` — making this project ready for contributors and safer for public use.
 
 ---

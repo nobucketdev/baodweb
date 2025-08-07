@@ -1,14 +1,11 @@
-import os
-import random
-import re
-import shutil
-import sys
+import os,random,re,shutil,sys,time
 from datetime import datetime
 import requests
 from core.configman import ConfigManager
 from core.parser import SUPPORTED_TAGS, Parser
 from core.search import hybrid_search # Assuming search_engine.py is in the same directory
 import html
+from __version__ import __version__, __author__, __description__, __license__
 
 # Import urllib.parse for robust URL handling
 from urllib.parse import urljoin, urlparse
@@ -19,9 +16,10 @@ else:
     import termios
     import tty
 print("────── BaodWeb Terminal Browser ───────")
-print(f"BaodWeb Terminal Browser version 1.2.4")
-print("Test ANSI:")
-print("\033[1;32mThis is a test of ANSI colors.\033[0m")
+print(f"BaodWeb Terminal Browser version {__version__} by {__author__}")
+print(f"Description: {__description__}")
+print(f"License: {__license__}")
+time.sleep(1)
 
 
 def resource_path(relative_path):
@@ -363,7 +361,128 @@ class Browser:
         self._next_anchor_id = [1]
         self.debug = debug
         self.scroll_offset = 0
+        
+    def _show_ansi_test_page(self):
+        ansi_lines = []
+        ansi_lines.append("<html><head><title>ANSI Test</title></head><body>")
+        # Styles
+        styles = {
+            "Bold": 1, "Dim": 2, "Italic": 3, "Underline": 4,
+            "Blink": 5, "Reverse": 7, "Hidden": 8, "Strikethrough": 9
+        }
+        ansi_lines.append("====Styles (0–9)====")
+        for name, code in styles.items():
+            ansi_lines.append(f"\033[{code}m{name:<15} ({code})\033[0m")
+        ansi_lines.append("<p></p>")
 
+        # Basic FG (30–37)
+        ansi_lines.append("===Foreground Colors (30–37)===")
+        ansi_lines.append(" ".join([f"\033[{i}m{i:>3}\033[0m" for i in range(30, 38)]))
+        ansi_lines.append("<p></p>")
+    
+        # Basic BG (40–47)
+        ansi_lines.append("===Background Colors (40–47)===")
+        ansi_lines.append(" ".join([f"\033[{i}m{i:>3}\033[0m" for i in range(40, 48)]))
+        ansi_lines.append("<p></p>")
+
+        # Bright FG (90–97)
+        ansi_lines.append("===Bright Foreground (90–97)===")
+        ansi_lines.append(" ".join([f"\033[{i}m{i:>3}\033[0m" for i in range(90, 98)]))
+        ansi_lines.append("<p></p>")
+
+        # Bright BG (100–107)
+        ansi_lines.append("===Bright Background (100–107)===")
+        ansi_lines.append(" ".join([f"\033[{i}m{i:>3}\033[0m" for i in range(100, 108)]))
+        ansi_lines.append("<p></p>")
+    
+        # 8-bit FG
+        ansi_lines.append("8-bit Foreground (0–255)")
+        for i in range(0, 256, 16):
+            row = " ".join([f"\033[38;5;{j}m{j:3}\033[0m" for j in range(i, i+16)])
+            ansi_lines.append(row)
+        ansi_lines.append("<p></p>")
+
+        # 8-bit BG
+        ansi_lines.append("===8-bit Background (0–255)===")
+        for i in range(0, 256, 16):
+            row = " ".join([f"\033[48;5;{j}m{j:3}\033[0m" for j in range(i, i+16)])
+            ansi_lines.append(row)
+        ansi_lines.append("<p></p>")
+
+        # Truecolor test (optional)
+        ansi_lines.append("===Truecolor RGB Gradient===")
+        for g in range(0, 256, 32):
+            row = "".join([f"\033[48;2;{r};{g};100m \033[0m" for r in range(0, 256, 8)])
+            ansi_lines.append(row)
+        ansi_lines.append("<p></p>")
+
+        # Detection prompt
+        ansi_lines.append("""
+    What do you see?
+    <ul>
+      <li>0 = ❌ Raw escape codes like \\033[38;5;196m</li>
+      <li>1 = 😐 No color/style at all</li>
+      <li>2 = 🎨 Basic ANSI only (30–107)</li>
+      <li>3 = 🟦 256-color (8-bit) working</li>
+      <li>4 = 🌈 TrueColor (24-bit RGB) gradient works</li>
+    </ul>
+    </body></html>
+    """)
+        ansi_lines.append("</body></html>")
+
+        html_content = "\n".join(ansi_lines)
+        self._base_url = None
+        self.current_url = "test:ansi-start"
+        self.last_html = html_content
+        elements, page_title = self.parser.parse(html_content, self._current_anchors, self._next_anchor_id)
+        self.current_title = page_title or "ANSI Test"
+        self.renderer.render_to_buffer(elements, self.current_title)
+        self.scroll_offset = 0
+        self.renderer.clear()
+        self.renderer.render_page(self.scroll_offset)
+
+
+    def _run_ansi_test_prompt(self):
+        self._show_ansi_test_page()
+        while True:
+            scroll_offset, usable_height, total_lines = self.renderer.render_page(self.scroll_offset)
+
+            # Draw prompt under content area
+            term_height = shutil.get_terminal_size((80, 24)).lines
+            prompt_line = term_height - 1
+
+            sys.stdout.write(f"\033[{prompt_line};1H")
+            sys.stdout.write("─" * shutil.get_terminal_size().columns)
+            sys.stdout.write(f"\033[{prompt_line+1};1H")
+            sys.stdout.write("\033[1;36m👉 What do you see? Enter a number (0–4) Scroll down use arrow to see more: \033[0m")
+            sys.stdout.write("\033[K")  # Clear rest of line
+            sys.stdout.flush()
+
+            key = self._get_key()
+            if key == "UP":
+                self.scroll_up()
+            elif key == "DOWN":
+                self.scroll_down()
+            elif key in "01234":
+                level = int(key)
+                messages = {
+                    0: "❌ Your terminal doesn't support ANSI at all.",
+                    1: "😐 Only plain text. No color or style.",
+                    2: "🎨 Basic ANSI styles are supported.",
+                    3: "🟦 256-color works! (8-bit)",
+                    4: "🌈 Full TrueColor (24-bit RGB) detected!"
+                }
+                sys.stdout.write(f"\n\033[1;33m{messages[level]}\033[0m\n")
+                sys.stdout.flush()
+                break
+            else:
+                sys.stdout.write("\nInvalid input. Press 0–4, or use up/down to scroll.\n")
+                sys.stdout.flush()
+
+        # Go to dashboard or home after test
+        self.navigate("dashboard")
+
+    
     def _resolve_url(self, base_url, relative_url):
         """Resolves a relative URL against a base URL using urllib.parse.urljoin."""
         return urljoin(base_url, relative_url)
@@ -468,6 +587,7 @@ class Browser:
                 print(f"Fetching {url}...")
                 response = requests.get(url, timeout=10)
                 response.raise_for_status()
+                response.encoding = 'utf-8' # Force the encoding to UTF-8
                 html_content = response.text
                 print(f"Successfully fetched {url}")
         except FileNotFoundError:
@@ -816,6 +936,7 @@ class Browser:
         )
 
         # Initial clear and render
+        self._run_ansi_test_prompt()
         self.renderer.clear()
         if self.config_manager.is_first_run():
             self.navigate("home")
