@@ -12,7 +12,7 @@
 ## Features
 
 - Terminal-based HTML rendering with color and formatting
-- Supports basic tags: `h1–h3`, `p`, `ul`, `ol`, `a`, `img`, `table`, `div`, `button`, etc..
+- Supports basic tags: `h1–h6`, `p`, `ul`, `ol`, `a`, `img`, `table`, `div`, `button`, etc..
 - Image rendering in terminal using ANSI art
 - Interactive navigation with link selection (`click <id>`)
 - Full config system to toggle rendering of tags
