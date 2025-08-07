@@ -1,6 +1,6 @@
 # BaodWeb - Terminal Web Browser
 
-![BaodWeb Version](https://img.shields.io/badge/BaodWeb-v1.2.4-blue.svg)
+![BaodWeb Version](https://img.shields.io/badge/BaodWeb-v1.3.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey)
 
